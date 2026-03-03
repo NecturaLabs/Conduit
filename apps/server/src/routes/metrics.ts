@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ApiError, ApiSuccess, MetricsDashboard, MetricsTimeSeries } from '@conduit/shared';
 import { requireAuth, requireCsrf } from '../middleware/auth.js';
 import * as metricsService from '../services/metrics.js';
+import { apiReadRateLimit, apiWriteRateLimit } from '../middleware/rateLimit.js';
 
 const timeSeriesSchema = z.object({
   metric: z.enum(['sessions', 'messages', 'tools', 'tokens', 'cost']),
@@ -22,7 +23,7 @@ export async function metricsRoutes(fastify: FastifyInstance): Promise<void> {
   // DELETE /metrics — wipe all metrics counters and dedup for this user
   fastify.delete(
     '/',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const userId = request.user!.id;
       const db = fastify.db;
@@ -41,6 +42,7 @@ export async function metricsRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /metrics/summary
   fastify.get(
     '/summary',
+    { config: { rateLimit: apiReadRateLimit } },
     async (request, reply) => {
       const parsed = summaryQuerySchema.safeParse(request.query);
       if (!parsed.success) {
@@ -76,6 +78,7 @@ export async function metricsRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /metrics/timeseries
   fastify.get(
     '/timeseries',
+    { config: { rateLimit: apiReadRateLimit } },
     async (request, reply) => {
       const parsed = timeSeriesSchema.safeParse(request.query);
       if (!parsed.success) {
@@ -112,6 +115,7 @@ export async function metricsRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /metrics/dashboard
   fastify.get(
     '/dashboard',
+    { config: { rateLimit: apiReadRateLimit } },
     async (request, reply) => {
       const parsed = summaryQuerySchema.safeParse(request.query);
       if (!parsed.success) {

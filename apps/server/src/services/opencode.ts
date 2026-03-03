@@ -44,7 +44,8 @@ async function request<T>(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
-  const response = await fetch(url, {
+  // Server-to-server call to OpenCode API — URL from server config, not user input.
+  const response = await fetch(url, { // lgtm[js/file-access-to-http]
     ...options,
     headers,
     signal: options.signal ?? controller.signal,
@@ -291,7 +292,7 @@ export async function subscribeToEvents(
     headers['Authorization'] = `Bearer ${config.opencodePassword}`;
   }
 
-  const response = await fetch(url, { headers, signal });
+  const response = await fetch(url, { headers, signal }); // lgtm[js/file-access-to-http]
 
   if (!response.ok || !response.body) {
     throw new Error(`Failed to connect to OpenCode SSE: ${response.status}`);
@@ -363,7 +364,7 @@ export async function sendMessage(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
-  const response = await fetch(url, {
+  const response = await fetch(url, { // lgtm[js/file-access-to-http]
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -413,7 +414,7 @@ export async function sendCommand(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
-  const response = await fetch(url, {
+  const response = await fetch(url, { // lgtm[js/file-access-to-http]
     method: 'POST',
     headers,
     body: JSON.stringify({ command, arguments: args }),

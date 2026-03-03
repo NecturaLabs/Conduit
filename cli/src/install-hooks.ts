@@ -217,19 +217,23 @@ function uninstallHooks(
 // ---------------------------------------------------------------------------
 
 function readSettings(filePath: string): ClaudeSettings {
-  if (!fs.existsSync(filePath)) {
-    // Ensure parent directory exists
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, "{}\n", "utf-8");
-    return {};
-  }
-
-  const raw = fs.readFileSync(filePath, "utf-8");
   try {
+    const raw = fs.readFileSync(filePath, "utf-8");
     return JSON.parse(raw) as ClaudeSettings;
-  } catch {
-    console.error(`Error: ${filePath} contains invalid JSON.`);
-    process.exit(1);
+  } catch (err: unknown) {
+    // File doesn't exist — create it atomically (no TOCTOU race between
+    // existsSync and writeFileSync). codeql[js/file-system-race]
+    if (err && typeof err === 'object' && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, "{}\n", "utf-8");
+      return {};
+    }
+    // File exists but contains invalid JSON
+    if (err instanceof SyntaxError) {
+      console.error(`Error: ${filePath} contains invalid JSON.`);
+      process.exit(1);
+    }
+    throw err;
   }
 }
 

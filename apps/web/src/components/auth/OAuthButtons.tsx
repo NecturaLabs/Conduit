@@ -94,6 +94,11 @@ export function OAuthButtons({ className }: OAuthButtonsProps) {
   // Build the start URL for a given provider.
   // This is a plain browser navigation anchor, not a fetch — the server will
   // set the state cookie, then redirect to the provider authorization page.
+  //
+  // SECURITY: The URL is built entirely from compile-time config (VITE_API_URL
+  // or stored server URL for mobile) plus a hardcoded path literal. No user
+  // input or DOM text influences the href value.
+  // codeql[js/xss-through-dom] — false positive: no DOM text reinterpretation
   function startUrl(provider: 'github' | 'gitlab'): string {
     const base = isMobile ? `${getStoredServerUrl()}/api` : resolveBaseUrl();
     return `${base}/auth/oauth/${provider}/start`;

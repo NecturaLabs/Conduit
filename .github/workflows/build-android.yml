@@ -117,7 +117,7 @@ jobs:
 
       # ── Create GitHub Release on main branch push ──────────────────────────
       - name: Create Release
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-${{ steps.version.outputs.version }}-build${{ github.run_number }}

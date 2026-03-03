@@ -1,8 +1,10 @@
 import { validateConfig, config } from './config.js';
 import { buildApp } from './app.js';
+import { initTokenHashKey } from './services/auth.js';
 
 async function main(): Promise<void> {
   validateConfig();
+  initTokenHashKey(config.jwtSecret);
 
   const app = await buildApp();
 

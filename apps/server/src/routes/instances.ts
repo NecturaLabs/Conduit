@@ -8,6 +8,7 @@ import { normalizeTs } from '../lib/db-helpers.js';
 import * as opencode from '../services/opencode.js';
 import { validateUrlNotPrivate } from '../services/url-validation.js';
 import { eventBus } from '../services/eventbus.js';
+import { apiReadRateLimit } from '../middleware/rateLimit.js';
 
 const createInstanceSchema = z.object({
   name: z.string().min(1).max(200),
@@ -311,7 +312,7 @@ export async function instanceRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.addHook('preHandler', requireAuth);
 
   // GET /instances
-  fastify.get('/', async (request, reply) => {
+  fastify.get('/', { config: { rateLimit: apiReadRateLimit } }, async (request, reply) => {
     const db = fastify.db;
     const userId = request.user!.id;
     const rows = db.query('SELECT * FROM instances WHERE user_id = ? ORDER BY created_at DESC').all(userId) as Array<Record<string, unknown>>;

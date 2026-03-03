@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { JWTPayload, RefreshJWTPayload } from '@conduit/shared';
 
 function base64urlEncode(data: string | Buffer): string {
@@ -10,8 +10,51 @@ function base64urlDecode(str: string): string {
   return Buffer.from(str, 'base64url').toString('utf-8');
 }
 
+/**
+ * Derived key for HMAC-SHA256 token hashing. Initialized once via
+ * {@link initTokenHashKey} at server startup (after config validation).
+ *
+ * The key is derived from `config.jwtSecret` using domain separation:
+ *   derivedKey = HMAC-SHA256(jwtSecret, "conduit:token-hash-key")
+ *
+ * This avoids reusing the raw JWT signing secret for a different purpose
+ * while not requiring operators to configure an additional env var.
+ */
+let _tokenHashKey: Buffer | null = null;
+
+/**
+ * Derive and cache the token-hash HMAC key from `jwtSecret`.
+ * MUST be called once after {@link validateConfig} succeeds.
+ */
+export function initTokenHashKey(jwtSecret: string): void {
+  // Domain-separated key derivation — the label ensures this key is
+  // cryptographically independent from any other use of jwtSecret.
+  _tokenHashKey = createHmac('sha256', jwtSecret)
+    .update('conduit:token-hash-key')
+    .digest();
+}
+
+/**
+ * Hash a high-entropy random token (e.g. magic link, refresh JWT) for storage/lookup.
+ *
+ * Uses HMAC-SHA256 with a server-side derived key (pepper) so that an attacker
+ * with read-only database access cannot correlate raw tokens to their stored
+ * hashes without also possessing the server secret — defense-in-depth per
+ * OWASP pepper / NIST SP 800-63B §5.1.2.2 recommendations.
+ *
+ * These tokens are 256-bit outputs of crypto.randomBytes, so brute-forcing is
+ * computationally infeasible (~2^256 search space). Slow password hashes like
+ * bcrypt are designed for low-entropy human-chosen passwords and would add
+ * unnecessary latency without security benefit here.
+ *
+ * CodeQL js/insufficient-password-hash flags this as a false positive because it
+ * cannot distinguish token hashing from password hashing.
+ */
 export function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+  if (!_tokenHashKey) {
+    throw new Error('Token hash key not initialized — call initTokenHashKey() at startup');
+  }
+  return createHmac('sha256', _tokenHashKey).update(token).digest('hex'); // codeql[js/insufficient-password-hash] — false positive: HMAC-keyed hash of high-entropy random tokens, not passwords
 }
 
 export function generateMagicLinkToken(): { raw: string; hash: string } {

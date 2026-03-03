@@ -21,7 +21,7 @@ import {
 import { sendMagicLink } from '../services/email.js';
 import { config } from '../config.js';
 import { requireAuth, requireCsrf } from '../middleware/auth.js';
-import { authRateLimit, refreshRateLimit } from '../middleware/rateLimit.js';
+import { authRateLimit, refreshRateLimit, apiReadRateLimit, apiWriteRateLimit } from '../middleware/rateLimit.js';
 import { mapUserRow } from '../lib/db-helpers.js';
 import {
   ACCESS_TOKEN_TTL,
@@ -416,7 +416,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 
   // POST /auth/logout
   // requireCsrf prevents cross-site logout (denial-of-service via forced session termination).
-  fastify.post('/logout', { preHandler: [requireAuth, requireCsrf] }, async (request, reply) => {
+  fastify.post('/logout', { preHandler: [requireAuth, requireCsrf], config: { rateLimit: apiWriteRateLimit } }, async (request, reply) => {
     const db = fastify.db;
 
     // Revoke current access token
@@ -461,7 +461,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   // GET /auth/me
-  fastify.get('/me', { preHandler: [requireAuth] }, async (request, reply) => {
+  fastify.get('/me', { preHandler: [requireAuth], config: { rateLimit: apiReadRateLimit } }, async (request, reply) => {
     const db = fastify.db;
     const userRow = db.query('SELECT * FROM users WHERE id = ?').get(request.user!.id) as Record<string, unknown> | undefined;
 
@@ -482,7 +482,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   // DELETE /auth/account — permanently delete the user's account and all associated data
-  fastify.delete('/account', { preHandler: [requireAuth] }, async (request, reply) => {
+  fastify.delete('/account', { preHandler: [requireAuth], config: { rateLimit: apiWriteRateLimit } }, async (request, reply) => {
     const db = fastify.db;
     const userId = request.user!.id;
     const userEmail = request.user!.email;

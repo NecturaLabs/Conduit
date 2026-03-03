@@ -18,6 +18,7 @@ import { promptBus } from './prompts.js';
 import { normalizeTs } from '../lib/db-helpers.js';
 import { sendMessage, sendCommand } from '../services/opencode.js';
 import { validateUrlNotPrivate } from '../services/url-validation.js';
+import { apiReadRateLimit } from '../middleware/rateLimit.js';
 import { pricingService } from '../services/pricing.js';
 
 const paginationSchema = z.object({
@@ -452,6 +453,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /sessions
   fastify.get<{ Querystring: PaginationParams }>(
     '/',
+    { config: { rateLimit: apiReadRateLimit } },
     async (request, reply) => {
       const parsed = paginationSchema.safeParse(request.query);
       if (!parsed.success) {

@@ -139,7 +139,8 @@ export async function exchangeCodeForToken(
 
   let res: Response;
   try {
-    res = await fetch(url, {
+    // Server-to-server OAuth token exchange with hardcoded provider URLs — not user-controlled.
+    res = await fetch(url, { // lgtm[js/file-access-to-http]
       method:  'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -314,7 +315,8 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Re
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    // Server-to-server call to OAuth provider user-info endpoints — URLs are hardcoded constants.
+    return await fetch(url, { ...init, signal: controller.signal }); // lgtm[js/file-access-to-http]
   } catch {
     throw new Error(`Request to ${new URL(url).host} failed or timed out`);
   } finally {

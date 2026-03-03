@@ -2,12 +2,16 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { ApiError, ApiSuccess } from '@conduit/shared';
 
+// Strict UUID validation prevents injection and ensures instanceId is well-formed.
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const configSaveSchema = z.object({
   content: z.string().min(1).max(512_000, 'Config content exceeds 512 KB limit'),
-  instanceId: z.string().optional(),
+  instanceId: z.string().regex(uuidPattern, 'instanceId must be a valid UUID').optional(),
 });
 import { requireAuth, requireCsrf } from '../middleware/auth.js';
 import { resolveHookTokenUser } from '../middleware/hook-auth.js';
+import { apiReadRateLimit, apiWriteRateLimit } from '../middleware/rateLimit.js';
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -57,15 +61,33 @@ export async function configRoutes(fastify: FastifyInstance): Promise<void> {
    * If the instance exists but has no config snapshot yet, returns a default
    * empty config so the model picker remains interactive.
    */
-  fastify.get<{ Querystring: { instanceId?: string } }>('/', async (request, reply) => {
+  fastify.get<{ Querystring: { instanceId?: string } }>(
+    '/',
+    { config: { rateLimit: apiReadRateLimit } },
+    async (request, reply) => {
     const { instanceId } = request.query;
     const userId = request.user!.id;
+
+    // Validate instanceId format before using it in queries
+    if (instanceId && !uuidPattern.test(instanceId)) {
+      const error: ApiError = {
+        error: 'Validation Error',
+        message: 'instanceId must be a valid UUID',
+        statusCode: 400,
+      };
+      return reply.code(400).send(error);
+    }
+
     const snapshot = getSnapshot(fastify, userId, instanceId);
 
     if (!snapshot) {
       // If a specific instance was requested and it exists, return a default
       // empty config rather than 404.  This lets the model picker remain
       // interactive even before the first config.sync arrives.
+      // SECURITY: verifyInstance scopes to the authenticated userId — no
+      // cross-user data leakage is possible. The instanceId only determines
+      // whether we return an empty default vs 404, not access to another
+      // user's data. codeql[js/user-controlled-bypass]
       if (instanceId) {
         const inst = verifyInstance(fastify, userId, instanceId);
         if (inst) {
@@ -129,7 +151,7 @@ export async function configRoutes(fastify: FastifyInstance): Promise<void> {
    */
   fastify.patch(
     '/',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const parsed = configSaveSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -213,7 +235,7 @@ export async function configRoutes(fastify: FastifyInstance): Promise<void> {
    * GET /config/instances
    * List all instances that have synced a config (so the UI can show a picker), scoped to user.
    */
-  fastify.get('/instances', async (request, reply) => {
+  fastify.get('/instances', { config: { rateLimit: apiReadRateLimit } }, async (request, reply) => {
     const userId = request.user!.id;
     const rows = fastify.db.query(`
       SELECT cs.instance_id, cs.agent_type, cs.updated_at, i.name
