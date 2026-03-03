@@ -26,8 +26,13 @@ function LazyFallback() {
 /** Strip the web app's /app basename and extract just the path+search for the router. */
 function toRouterPath(url: string): string | null {
   try {
-    const { pathname, search } = new URL(url);
-    return pathname.replace(/^\/app/, '') + search;
+    const parsed = new URL(url);
+    // conduit:// deep links: conduit://auth/verify?token=...
+    // The host becomes the first path segment in URL parsing (e.g. host="auth", pathname="/verify")
+    if (parsed.protocol === 'conduit:') {
+      return '/' + parsed.host + parsed.pathname + parsed.search;
+    }
+    return parsed.pathname.replace(/^\/app/, '') + parsed.search;
   } catch {
     return null;
   }

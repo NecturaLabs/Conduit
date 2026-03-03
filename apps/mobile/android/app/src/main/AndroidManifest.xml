@@ -22,14 +22,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Android App Links: intercept magic link verification URLs -->
-            <intent-filter android:autoVerify="true">
+            <!-- Custom scheme deep link: intercept conduit:// magic link callbacks -->
+            <!-- conduit://auth/verify?token=... is sent by the server when mobile=true -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https"
-                      android:host="${applicationId}.example.com"
-                      android:pathPrefix="/app/auth/verify" />
+                <data android:scheme="conduit" />
             </intent-filter>
 
         </activity>

@@ -4,7 +4,7 @@ import { Zap, AlertCircle } from 'lucide-react';
 import { MagicLinkForm } from '@/components/auth/MagicLinkForm';
 import { OAuthButtons } from '@/components/auth/OAuthButtons';
 import { Spinner } from '@/components/ui/Spinner';
-import { api, isMobile, getStoredServerUrl } from '@/lib/api';
+import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import type { UserProfile } from '@conduit/shared';
 
@@ -27,10 +27,8 @@ export function Auth() {
   const setOnboarded = useAuthStore((s) => s.setOnboarded);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  const [verifying,    setVerifying]    = useState(false);
-  const [verifyError,  setVerifyError]  = useState('');
-  // Mobile only: live server URL state so OAuthButtons re-fetches when edited.
-  const [serverUrl, setServerUrl] = useState(() => isMobile ? getStoredServerUrl() : '');
+  const [verifying,   setVerifying]   = useState(false);
+  const [verifyError, setVerifyError] = useState('');
 
   const token       = searchParams.get('token');
   const oauthError  = searchParams.get('error');
@@ -114,16 +112,16 @@ export function Auth() {
           ) : verifyError ? (
             <div className="flex flex-col items-center gap-3 py-4">
               <p className="text-sm text-[var(--color-danger)]" role="alert">{verifyError}</p>
-              <div className="flex flex-col gap-4 w-full">
-                <OAuthButtons serverUrl={serverUrl} />
+            <div className="flex flex-col gap-4 w-full">
+                <OAuthButtons />
                 <Divider />
-                <MagicLinkForm serverUrl={serverUrl} onServerUrlChange={setServerUrl} />
+                <MagicLinkForm />
               </div>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
               {/* OAuth login buttons — only rendered when providers are configured */}
-              <OAuthButtons serverUrl={serverUrl} />
+              <OAuthButtons />
 
               {/* Divider — only rendered when at least one OAuth provider is configured.
                   OAuthButtons renders nothing when no providers are active, so the divider
@@ -135,7 +133,7 @@ export function Auth() {
                   because the flex container collapses the empty sibling. */}
               <Divider />
 
-              <MagicLinkForm serverUrl={serverUrl} onServerUrlChange={setServerUrl} />
+              <MagicLinkForm />
             </div>
           )}
         </div>

@@ -1,49 +1,14 @@
 import type { ApiError } from '@conduit/shared';
 import { useAuthStore } from '@/store/auth';
 
-const STORAGE_KEY = 'conduit_server_url';
-const DEFAULT_SERVER = 'https://conduit-api.ms-mvp.com';
-
-export const isMobile = Boolean(import.meta.env.VITE_MOBILE);
-
-export function getStoredServerUrl(): string {
-  return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_SERVER;
-}
-
-export function setStoredServerUrl(url: string): void {
-  localStorage.setItem(STORAGE_KEY, url.trim().replace(/\/$/, ''));
-}
-
-/** Resolved per-request so URL changes take effect immediately without reload. */
+/**
+ * Resolves the API base URL per-request.
+ * Both web and mobile use VITE_API_URL (set at build time via env).
+ * Web falls back to '/api' for the dev proxy. Mobile has no fallback —
+ * VITE_API_URL must be set when building the APK.
+ */
 export function resolveBaseUrl(): string {
-  if (isMobile) {
-    return getStoredServerUrl();
-  }
   return import.meta.env.VITE_API_URL || '/api';
-}
-
-// Keep BASE_URL as a non-null export for the rare direct usages (tryRefresh, etc.)
-// In mobile mode it resolves dynamically; in web mode it's a build-time constant.
-export const BASE_URL = isMobile ? DEFAULT_SERVER : (import.meta.env.VITE_API_URL || '/api');
-
-class ApiClientError extends Error {
-  constructor(
-    public statusCode: number,
-    public error: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ApiClientError';
-  }
-}
-
-async function parseError(res: Response): Promise<ApiClientError> {
-  try {
-    const body = (await res.json()) as ApiError;
-    return new ApiClientError(body.statusCode, body.error, body.message);
-  } catch {
-    return new ApiClientError(res.status, res.statusText, 'An unexpected error occurred');
-  }
 }
 
 /**
@@ -150,6 +115,26 @@ async function request<T>(
   }
 
   return json as T;
+}
+
+class ApiClientError extends Error {
+  constructor(
+    public statusCode: number,
+    public error: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiClientError';
+  }
+}
+
+async function parseError(res: Response): Promise<ApiClientError> {
+  try {
+    const body = (await res.json()) as ApiError;
+    return new ApiClientError(body.statusCode, body.error, body.message);
+  } catch {
+    return new ApiClientError(res.status, res.statusText, 'An unexpected error occurred');
+  }
 }
 
 export const api = {

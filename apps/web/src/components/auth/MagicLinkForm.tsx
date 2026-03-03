@@ -1,40 +1,21 @@
 import { useState, type FormEvent } from 'react';
-import { Mail, ArrowRight, CheckCircle, Server } from 'lucide-react';
+import { Mail, ArrowRight, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
-import { api, isMobile, setStoredServerUrl } from '@/lib/api';
+import { api } from '@/lib/api';
 import type { MagicLinkResponse } from '@conduit/shared';
 
-interface MagicLinkFormProps {
-  /**
-   * Mobile only: the live server URL value (controlled by the parent Auth page
-   * so OAuthButtons can react to changes in real time).
-   */
-  serverUrl?: string;
-  /** Mobile only: called whenever the server URL input changes. */
-  onServerUrlChange?: (url: string) => void;
-}
-
-export function MagicLinkForm({ serverUrl = '', onServerUrlChange }: MagicLinkFormProps) {
+export function MagicLinkForm() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  function handleServerUrlChange(value: string) {
-    // Persist immediately so the API client and OAuthButtons both see the new
-    // URL before the magic-link form is submitted.
-    if (isMobile) setStoredServerUrl(value);
-    onServerUrlChange?.(value);
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!isValidEmail) return;
-    // Ensure any trailing edits are flushed before the request goes out.
-    if (isMobile) setStoredServerUrl(serverUrl);
 
     setStatus('loading');
     setErrorMessage('');
@@ -74,27 +55,6 @@ export function MagicLinkForm({ serverUrl = '', onServerUrlChange }: MagicLinkFo
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-sm">
-      {isMobile && (
-        <div className="flex flex-col gap-2">
-          <label htmlFor="server-url" className="text-sm font-medium text-[var(--color-text)]">
-            Server URL
-          </label>
-          <div className="relative">
-            <Server className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-muted)]" aria-hidden="true" />
-          <Input
-              id="server-url"
-              type="url"
-              placeholder="https://your-conduit-api.example.com"
-              value={serverUrl}
-              onChange={(e) => handleServerUrlChange(e.target.value)}
-              className="pl-10"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-          </div>
-        </div>
-      )}
       <div className="flex flex-col gap-2">
         <label htmlFor="email" className="text-sm font-medium text-[var(--color-text)]">
           Email address
