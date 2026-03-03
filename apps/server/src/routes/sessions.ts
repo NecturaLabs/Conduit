@@ -18,7 +18,7 @@ import { promptBus } from './prompts.js';
 import { normalizeTs } from '../lib/db-helpers.js';
 import { sendMessage, sendCommand } from '../services/opencode.js';
 import { validateUrlNotPrivate } from '../services/url-validation.js';
-import { apiReadRateLimit } from '../middleware/rateLimit.js';
+import { apiReadRateLimit, apiWriteRateLimit } from '../middleware/rateLimit.js';
 import { pricingService } from '../services/pricing.js';
 
 const paginationSchema = z.object({
@@ -482,6 +482,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /sessions/:id
   fastify.get<{ Params: { id: string }; Querystring: { limit?: string; before?: string } }>(
     '/:id',
+    { config: { rateLimit: apiReadRateLimit } },
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user!.id;
@@ -1201,7 +1202,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /sessions/:id/prompt — queue a prompt for the plugin to relay to OpenCode
   fastify.post<{ Params: { id: string }; Body: { content: string; isCommand?: boolean } }>(
     '/:id/prompt',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const { id } = request.params;
       const body = request.body as { content?: string; isCommand?: boolean } | null;
@@ -1349,6 +1350,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /sessions/:id/prompt-status — check status of pending prompts for a session (scoped to user)
   fastify.get<{ Params: { id: string } }>(
     '/:id/prompt-status',
+    { config: { rateLimit: apiReadRateLimit } },
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user!.id;
@@ -1386,7 +1388,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /sessions — not supported (sessions are created by the agent)
   fastify.post(
     '/',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (_request, reply) => {
       const error: ApiError = {
         error: 'Not Supported',
@@ -1400,7 +1402,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // DELETE /sessions/:id — remove all events for that session_id (scoped to user)
   fastify.delete<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user!.id;
@@ -1438,7 +1440,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /sessions/:id/archive — archive a session for the current user
   fastify.post<{ Params: { id: string } }>(
     '/:id/archive',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user!.id;
@@ -1471,7 +1473,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // DELETE /sessions/:id/archive — unarchive a session for the current user
   fastify.delete<{ Params: { id: string } }>(
     '/:id/archive',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user!.id;
@@ -1496,7 +1498,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /sessions/batch/delete — delete multiple sessions
   fastify.post<{ Body: z.infer<typeof batchIdsSchema> }>(
     '/batch/delete',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const parsed = batchIdsSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1536,7 +1538,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /sessions/batch/archive — archive multiple sessions
   fastify.post<{ Body: z.infer<typeof batchIdsSchema> }>(
     '/batch/archive',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const parsed = batchIdsSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1576,7 +1578,7 @@ export async function sessionRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /sessions/batch/unarchive — unarchive multiple sessions
   fastify.post<{ Body: z.infer<typeof batchIdsSchema> }>(
     '/batch/unarchive',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const parsed = batchIdsSchema.safeParse(request.body);
       if (!parsed.success) {

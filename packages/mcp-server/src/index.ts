@@ -124,7 +124,7 @@ async function api<T = unknown>(
     authorization: `Bearer ${HOOK_TOKEN}`,
     ...((opts.headers as Record<string, string>) ?? {}),
   };
-  const res = await fetch(url, { ...opts, headers });
+  const res = await fetch(url, { ...opts, headers }); // codeql[js/file-access-to-http] — server-to-server; API_URL from env config
   let data: T;
   try {
     const json = (await res.json()) as { data: T };
@@ -771,7 +771,7 @@ server.registerTool(
       .digest("hex");
 
     // Server-to-server call to Conduit API — URL from environment config, not user input.
-    const res = await fetch(`${API_URL}/api/hooks`, { // lgtm[js/file-access-to-http]
+    const res = await fetch(`${API_URL}/api/hooks`, { // codeql[js/file-access-to-http] — server-to-server; API_URL from env config
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -1065,7 +1065,7 @@ async function sendConfigSync(): Promise<void> {
     .digest("hex");
 
   try {
-    // lgtm[js/file-access-to-http] — server-to-server call; API_URL from env config.
+    // codeql[js/file-access-to-http] — server-to-server call; API_URL from env config.
     const res = await fetch(`${API_URL}/api/hooks`, {
       method: "POST",
       headers: {
@@ -1100,7 +1100,7 @@ async function sendModelsSync(models: typeof CLAUDE_MODELS): Promise<void> {
     .digest("hex");
 
   try {
-    // lgtm[js/file-access-to-http] — server-to-server call; API_URL from env config.
+    // codeql[js/file-access-to-http] — server-to-server call; API_URL from env config.
     const res = await fetch(`${API_URL}/api/hooks`, {
       method: "POST",
       headers: {

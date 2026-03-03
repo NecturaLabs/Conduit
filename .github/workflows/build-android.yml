@@ -136,5 +136,7 @@ jobs:
             ### Requirements
             - Android 7.0+ (API 24)
           files: apps/mobile/android/app/build/outputs/apk/release/conduit-signed.apk
+          fail_on_unmatched_files: false
+          make_latest: true
           draft: false
           prerelease: false
