@@ -68,6 +68,7 @@ jobs:
           vars.DEPLOY_BACKEND == 'true'
           && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
           && github.ref == 'refs/heads/main'
+        continue-on-error: true
         env:
           DOKPLOY_TOKEN: ${{ secrets.DOKPLOY_TOKEN }}
           DOKPLOY_API: ${{ secrets.DOKPLOY_API_URL }}
@@ -83,6 +84,6 @@ jobs:
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
             echo "Dokploy source-deploy triggered (HTTP $HTTP_STATUS)"
           else
-            echo "::error::Dokploy deploy failed (HTTP $HTTP_STATUS)"
+            echo "::warning::Dokploy deploy returned HTTP $HTTP_STATUS — the build/type-check succeeded but the deploy trigger failed. Check Dokploy configuration."
             exit 1
           fi

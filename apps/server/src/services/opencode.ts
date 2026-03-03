@@ -45,7 +45,7 @@ async function request<T>(
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
   // Server-to-server call to OpenCode API — URL from server config, not user input.
-  const response = await fetch(url, { // lgtm[js/file-access-to-http]
+  const response = await fetch(url, { // codeql[js/file-access-to-http] — server-to-server; URL from server config
     ...options,
     headers,
     signal: options.signal ?? controller.signal,
@@ -292,7 +292,7 @@ export async function subscribeToEvents(
     headers['Authorization'] = `Bearer ${config.opencodePassword}`;
   }
 
-  const response = await fetch(url, { headers, signal }); // lgtm[js/file-access-to-http]
+  const response = await fetch(url, { headers, signal }); // codeql[js/file-access-to-http] — server-to-server; URL from server config
 
   if (!response.ok || !response.body) {
     throw new Error(`Failed to connect to OpenCode SSE: ${response.status}`);
@@ -364,7 +364,7 @@ export async function sendMessage(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
-  const response = await fetch(url, { // lgtm[js/file-access-to-http]
+  const response = await fetch(url, { // codeql[js/file-access-to-http] — server-to-server; URL from server config
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -414,7 +414,7 @@ export async function sendCommand(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
-  const response = await fetch(url, { // lgtm[js/file-access-to-http]
+  const response = await fetch(url, { // codeql[js/file-access-to-http] — server-to-server; URL from server config
     method: 'POST',
     headers,
     body: JSON.stringify({ command, arguments: args }),
@@ -468,7 +468,7 @@ export async function checkHealth(baseUrl: string): Promise<{ healthy: boolean; 
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(`${baseUrl}/global/health`, {
+    const response = await fetch(`${baseUrl}/global/health`, { // codeql[js/file-access-to-http] — server-to-server health check; URL from server config
       signal: controller.signal,
     });
     clearTimeout(timeout);

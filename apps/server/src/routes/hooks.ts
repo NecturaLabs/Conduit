@@ -5,7 +5,7 @@ import type { ApiError, ApiSuccess, HookPayload, HookResponse } from '@conduit/s
 import { generateOpenCodePluginSource } from '@conduit/shared';
 import { verifyHmacSignature, computeHmacSignature } from '../services/auth.js';
 import { config } from '../config.js';
-import { webhookRateLimit } from '../middleware/rateLimit.js';
+import { webhookRateLimit, apiReadRateLimit, apiWriteRateLimit } from '../middleware/rateLimit.js';
 import { requireAuth, requireCsrf } from '../middleware/auth.js';
 import { eventBus } from '../services/eventbus.js';
 import { resolveHookTokenUser, extractBearerToken } from '../middleware/hook-auth.js';
@@ -1134,7 +1134,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
   // Browser calls this when the user enters the user_code and clicks approve.
   fastify.post(
     '/install/approve',
-    { preHandler: [requireAuth, requireCsrf] },
+    { preHandler: [requireAuth, requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const approveSchema = z.object({
         user_code: z.string().min(1, 'user_code is required'),
@@ -1195,7 +1195,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /hooks/install-claude.sh — static bootstrap script (no params!)
   // This is the script piped from `curl -fsSL .../install-claude.sh | bash`
   // It runs the device flow interactively in the terminal.
-  fastify.get('/install-claude.sh', async (_request, reply) => {
+  fastify.get('/install-claude.sh', { config: { rateLimit: apiReadRateLimit } }, async (_request, reply) => {
     const apiUrl = config.apiUrl;
 
     // SECURITY (CRIT-2): Refuse to serve the install script over plain HTTP in production.
@@ -1328,7 +1328,7 @@ exit 1
 
   // GET /hooks/install-claude.ps1 — static bootstrap script (no params!)
   // This is the script piped from `iwr -useb .../install-claude.ps1 | iex`
-  fastify.get('/install-claude.ps1', async (_request, reply) => {
+  fastify.get('/install-claude.ps1', { config: { rateLimit: apiReadRateLimit } }, async (_request, reply) => {
     const apiUrl = config.apiUrl;
 
     // SECURITY (CRIT-2): Refuse to serve the install script over plain HTTP in production.
@@ -1458,7 +1458,7 @@ exit 1
 
   // GET /hooks/install-opencode.sh — bootstrap for OpenCode (bash device flow)
   // Usage: curl -fsSL .../install-opencode.sh | bash
-  fastify.get('/install-opencode.sh', async (_request, reply) => {
+  fastify.get('/install-opencode.sh', { config: { rateLimit: apiReadRateLimit } }, async (_request, reply) => {
     const apiUrl = config.apiUrl;
 
     // SECURITY (CRIT-2): Refuse to serve the install script over plain HTTP in production.
@@ -1569,7 +1569,7 @@ exit 1
 
   // GET /hooks/install-opencode.ps1 — bootstrap for OpenCode (PowerShell device flow)
   // Usage: iwr -useb .../install-opencode.ps1 | iex
-  fastify.get('/install-opencode.ps1', async (_request, reply) => {
+  fastify.get('/install-opencode.ps1', { config: { rateLimit: apiReadRateLimit } }, async (_request, reply) => {
     const apiUrl = config.apiUrl;
 
     // SECURITY (CRIT-2): Refuse to serve the install script over plain HTTP in production.
@@ -1695,7 +1695,7 @@ exit 1
   });
 
   // GET /hooks/uninstall-claude.sh — removes helper + settings.json hooks
-  fastify.get('/uninstall-claude.sh', async (_request, reply) => {
+  fastify.get('/uninstall-claude.sh', { config: { rateLimit: apiReadRateLimit } }, async (_request, reply) => {
     return reply
       .code(200)
       .header('Content-Type', 'text/plain; charset=utf-8')
@@ -1705,7 +1705,7 @@ exit 1
   });
 
   // GET /hooks/uninstall-claude.ps1 — removes helper + settings.json hooks (Windows)
-  fastify.get('/uninstall-claude.ps1', async (_request, reply) => {
+  fastify.get('/uninstall-claude.ps1', { config: { rateLimit: apiReadRateLimit } }, async (_request, reply) => {
     return reply
       .code(200)
       .header('Content-Type', 'text/plain; charset=utf-8')
@@ -1715,7 +1715,7 @@ exit 1
   });
 
   // GET /hooks/uninstall-opencode.sh — removes OpenCode plugin (Linux/macOS)
-  fastify.get('/uninstall-opencode.sh', async (_request, reply) => {
+  fastify.get('/uninstall-opencode.sh', { config: { rateLimit: apiReadRateLimit } }, async (_request, reply) => {
     return reply
       .code(200)
       .header('Content-Type', 'text/plain; charset=utf-8')
@@ -1725,7 +1725,7 @@ exit 1
   });
 
   // GET /hooks/uninstall-opencode.ps1 — removes OpenCode plugin (Windows)
-  fastify.get('/uninstall-opencode.ps1', async (_request, reply) => {
+  fastify.get('/uninstall-opencode.ps1', { config: { rateLimit: apiReadRateLimit } }, async (_request, reply) => {
     return reply
       .code(200)
       .header('Content-Type', 'text/plain; charset=utf-8')
@@ -2339,7 +2339,7 @@ exit 1
   // CapacitorHttp may not forward custom headers like X-Requested-With for POST requests.
   fastify.get(
     '/token',
-    { preHandler: [requireAuth] },
+    { preHandler: [requireAuth], config: { rateLimit: apiReadRateLimit } },
     async (request, reply) => {
       const userId = request.user!.id;
       const db = fastify.db;
@@ -2382,7 +2382,7 @@ exit 1
   // Same semantics: returns token plaintext only on first creation; masked on subsequent calls.
   fastify.post(
     '/token',
-    { preHandler: [requireAuth, requireCsrf] },
+    { preHandler: [requireAuth, requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const userId = request.user!.id;
       const db = fastify.db;
@@ -2421,7 +2421,7 @@ exit 1
   // Always returns the new plaintext token exactly once.
   fastify.post(
     '/token/regenerate',
-    { preHandler: [requireAuth, requireCsrf] },
+    { preHandler: [requireAuth, requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const userId = request.user!.id;
       const db = fastify.db;

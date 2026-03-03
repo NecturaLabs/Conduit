@@ -108,7 +108,7 @@ export function OAuthButtons({ className }: OAuthButtonsProps) {
     <div className={cn('flex flex-col gap-3 w-full', className)}>
       {providers.github && (
         <a
-          href={startUrl('github')}
+          href={startUrl('github')} // codeql[js/xss-through-dom] — false positive: URL built from compile-time config + hardcoded path literal
           className={cn(
             'inline-flex items-center justify-center gap-2.5 rounded-md font-medium transition-colors',
             'h-11 px-4 py-2 text-sm w-full',
@@ -125,7 +125,7 @@ export function OAuthButtons({ className }: OAuthButtonsProps) {
 
       {providers.gitlab && (
         <a
-          href={startUrl('gitlab')}
+          href={startUrl('gitlab')} // codeql[js/xss-through-dom] — false positive: URL built from compile-time config + hardcoded path literal
           className={cn(
             'inline-flex items-center justify-center gap-2.5 rounded-md font-medium transition-colors',
             'h-11 px-4 py-2 text-sm w-full',

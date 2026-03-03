@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # needed to push auto-incremented version commit
+  contents: read   # read-only; version bump is local-only for the build
   id-token: write  # required for npm --provenance (OIDC attestation)
 
 concurrency:
@@ -51,13 +51,13 @@ jobs:
         run: bun install --frozen-lockfile --ignore-scripts
 
       # Auto-increment patch version if the current version is already on npm.
-      # Keeps bumping until it finds a version that hasn't been published yet,
-      # then commits the updated package.json back to main via the GitHub API
-      # (which produces verified/signed commits that satisfy branch protection).
+      # Keeps bumping until it finds a version that hasn't been published yet.
+      # The bumped version is used locally for the build/publish only — it is NOT
+      # committed back to main (branch protection rules block direct pushes).
+      # The next push-triggered run will re-detect the published version and bump
+      # again if needed, making the process idempotent.
       - name: Auto-increment version if needed
         id: auto-bump
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd packages/mcp-server
           PACKAGE_NAME=$(node -p "require('./package.json').name")
@@ -80,7 +80,7 @@ jobs:
           done
 
           if [ "$VERSION" != "$CURRENT" ]; then
-            echo "Bumping $PACKAGE_NAME from $CURRENT → $VERSION"
+            echo "Bumping $PACKAGE_NAME from $CURRENT → $VERSION (local only, not committed)"
 
             # Update package.json locally for the build step
             node -e "
@@ -89,21 +89,6 @@ jobs:
               pkg.version = '$VERSION';
               fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             "
-
-            # Commit via GitHub API — produces a verified commit that satisfies
-            # branch protection rules (signed commits, PR bypass for bots).
-            CONTENT=$(base64 -w 0 package.json)
-            SHA=$(gh api repos/${{ github.repository }}/contents/packages/mcp-server/package.json \
-              --jq '.sha')
-            gh api repos/${{ github.repository }}/contents/packages/mcp-server/package.json \
-              -X PUT \
-              -f message="chore(mcp-server): bump version to $VERSION [skip ci]" \
-              -f content="$CONTENT" \
-              -f sha="$SHA" \
-              -f branch="main"
-
-            # Pull the API-created commit so local tree stays in sync
-            git pull --ff-only origin main
           else
             echo "$PACKAGE_NAME@$VERSION not yet on npm — no bump needed"
           fi

@@ -8,7 +8,7 @@ import { normalizeTs } from '../lib/db-helpers.js';
 import * as opencode from '../services/opencode.js';
 import { validateUrlNotPrivate } from '../services/url-validation.js';
 import { eventBus } from '../services/eventbus.js';
-import { apiReadRateLimit } from '../middleware/rateLimit.js';
+import { apiReadRateLimit, apiWriteRateLimit } from '../middleware/rateLimit.js';
 
 const createInstanceSchema = z.object({
   name: z.string().min(1).max(200),
@@ -327,7 +327,7 @@ export async function instanceRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /instances
   fastify.post(
     '/',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const parsed = createInstanceSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -376,7 +376,7 @@ export async function instanceRoutes(fastify: FastifyInstance): Promise<void> {
   // DELETE /instances/:id
   fastify.delete<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const { id } = request.params;
       const db = fastify.db;
@@ -408,7 +408,7 @@ export async function instanceRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /instances/:id/test
   fastify.post<{ Params: { id: string } }>(
     '/:id/test',
-    { preHandler: [requireCsrf] },
+    { preHandler: [requireCsrf], config: { rateLimit: apiWriteRateLimit } },
     async (request, reply) => {
       const { id } = request.params;
       const db = fastify.db;
