@@ -1,0 +1,44 @@
+name: Setup / Configuration Help
+description: Trouble getting Conduit running or configured
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [README](https://github.com/NecturaLabs/ConduitP#readme) first — it covers the full self-hosted setup, secret generation, and common configuration options.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What are you trying to do?
+      placeholder: "I'm trying to self-host Conduit using Docker but..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - OS / platform:
+        - Docker version:
+        - Deployment target: local / VPS / other
+        - Agent: OpenCode / Claude Code / both
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages or logs
+      description: Paste output from `docker compose logs` or browser console errors.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant configuration
+      description: Paste the relevant parts of your `docker-compose.yml`. Remove any secrets before posting.
+      render: yaml
