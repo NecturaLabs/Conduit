@@ -16,6 +16,12 @@ import { cn } from '@/lib/utils';
 import { resolveBaseUrl, isMobile, getStoredServerUrl } from '@/lib/api';
 
 // ---------------------------------------------------------------------------
+// The serverUrl prop (mobile only) lets the parent pass down the live value
+// so that OAuthButtons re-fetches whenever the user edits the server URL field
+// before they have submitted the magic-link form.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // Provider SVG icons (inline — no external requests, no CDN dependency)
 // Source: GitHub/GitLab brand assets, simplified to single-path monochrome
 // ---------------------------------------------------------------------------
@@ -60,20 +66,36 @@ interface ProvidersResponse {
 interface OAuthButtonsProps {
   /** Optional extra class names on the container */
   className?: string;
+  /**
+   * Mobile only: the live server URL from the parent form. When provided the
+   * component uses this value (and re-fetches when it changes) instead of
+   * reading from localStorage on mount only.
+   */
+  serverUrl?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function OAuthButtons({ className }: OAuthButtonsProps) {
+export function OAuthButtons({ className, serverUrl }: OAuthButtonsProps) {
   const [providers, setProviders] = useState<ProvidersResponse | null>(null);
   const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     // Resolve the base URL the same way the API client does so mobile (custom
     // server URL) and web (VITE_API_URL) both work correctly.
-    const base = isMobile ? getStoredServerUrl() : resolveBaseUrl();
+    // When a serverUrl prop is supplied (mobile, live-editing) use that directly;
+    // otherwise fall back to the stored value or the build-time env var.
+    const base = isMobile
+      ? (serverUrl?.trim().replace(/\/$/, '') || getStoredServerUrl())
+      : resolveBaseUrl();
+
+    if (!base) {
+      setProviders(null);
+      setLoading(false);
+      return;
+    }
 
     fetch(`${base}/auth/oauth/providers`, {
       // No credentials needed — this is a public config endpoint.
@@ -84,7 +106,7 @@ export function OAuthButtons({ className }: OAuthButtonsProps) {
       .then((data: ProvidersResponse | null) => setProviders(data))
       .catch(() => setProviders(null))
       .finally(() => setLoading(false));
-  }, []);
+  }, [serverUrl]);
 
   // Don't render anything while loading or if neither provider is configured
   if (loading || !providers || (!providers.github && !providers.gitlab)) {
@@ -100,7 +122,9 @@ export function OAuthButtons({ className }: OAuthButtonsProps) {
   // input or DOM text influences the href value.
   // codeql[js/xss-through-dom] — false positive: no DOM text reinterpretation
   function startUrl(provider: 'github' | 'gitlab'): string {
-    const base = isMobile ? getStoredServerUrl() : resolveBaseUrl();
+    const base = isMobile
+      ? (serverUrl?.trim().replace(/\/$/, '') || getStoredServerUrl())
+      : resolveBaseUrl();
     return `${base}/auth/oauth/${provider}/start`;
   }
 

@@ -2,7 +2,7 @@ import type { ApiError } from '@conduit/shared';
 import { useAuthStore } from '@/store/auth';
 
 const STORAGE_KEY = 'conduit_server_url';
-const DEFAULT_SERVER = '';
+const DEFAULT_SERVER = 'https://conduit-api.ms-mvp.com';
 
 export const isMobile = Boolean(import.meta.env.VITE_MOBILE);
 

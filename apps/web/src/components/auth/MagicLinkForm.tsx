@@ -3,20 +3,37 @@ import { Mail, ArrowRight, CheckCircle, Server } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
-import { api, isMobile, getStoredServerUrl, setStoredServerUrl } from '@/lib/api';
+import { api, isMobile, setStoredServerUrl } from '@/lib/api';
 import type { MagicLinkResponse } from '@conduit/shared';
 
-export function MagicLinkForm() {
+interface MagicLinkFormProps {
+  /**
+   * Mobile only: the live server URL value (controlled by the parent Auth page
+   * so OAuthButtons can react to changes in real time).
+   */
+  serverUrl?: string;
+  /** Mobile only: called whenever the server URL input changes. */
+  onServerUrlChange?: (url: string) => void;
+}
+
+export function MagicLinkForm({ serverUrl = '', onServerUrlChange }: MagicLinkFormProps) {
   const [email, setEmail] = useState('');
-  const [serverUrl, setServerUrl] = useState(getStoredServerUrl);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+  function handleServerUrlChange(value: string) {
+    // Persist immediately so the API client and OAuthButtons both see the new
+    // URL before the magic-link form is submitted.
+    if (isMobile) setStoredServerUrl(value);
+    onServerUrlChange?.(value);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!isValidEmail) return;
+    // Ensure any trailing edits are flushed before the request goes out.
     if (isMobile) setStoredServerUrl(serverUrl);
 
     setStatus('loading');
@@ -64,12 +81,12 @@ export function MagicLinkForm() {
           </label>
           <div className="relative">
             <Server className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-muted)]" aria-hidden="true" />
-            <Input
+          <Input
               id="server-url"
               type="url"
               placeholder="https://your-conduit-api.example.com"
               value={serverUrl}
-              onChange={(e) => setServerUrl(e.target.value)}
+              onChange={(e) => handleServerUrlChange(e.target.value)}
               className="pl-10"
               autoCapitalize="none"
               autoCorrect="off"
