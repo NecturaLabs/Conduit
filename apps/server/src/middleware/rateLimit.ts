@@ -15,6 +15,15 @@ export const oauthStartRateLimit = {
   timeWindow: '15 minutes',
 };
 
+/** Rate limit for OAuth callback endpoints.
+ *  Callbacks involve DB writes and outbound HTTP to providers so they should
+ *  be rate-limited, but generously — a legitimate user only hits this once per
+ *  login and many users may share an IP behind a corporate proxy. */
+export const oauthCallbackRateLimit = {
+  max: 30,
+  timeWindow: '15 minutes',
+};
+
 export const webhookRateLimit = {
   max: 1000,
   timeWindow: '1 minute',

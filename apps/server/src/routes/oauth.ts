@@ -50,7 +50,7 @@ import {
   hashToken,
 } from '../services/auth.js';
 import { config } from '../config.js';
-import { oauthStartRateLimit } from '../middleware/rateLimit.js';
+import { oauthStartRateLimit, oauthCallbackRateLimit } from '../middleware/rateLimit.js';
 import { mapUserRow } from '../lib/db-helpers.js';
 import {
   REFRESH_TOKEN_TTL,
@@ -157,12 +157,13 @@ export async function oauthRoutes(fastify: FastifyInstance): Promise<void> {
   );
 
   // GET /auth/oauth/:provider/callback?code=...&state=...
-  // Completes the OAuth flow — no rate limit here (providers redirect users to this).
+  // Completes the OAuth flow.
   fastify.get<{
     Params:      { provider: string };
     Querystring: { code?: string; state?: string; error?: string };
   }>(
     '/:provider/callback',
+    { config: { rateLimit: oauthCallbackRateLimit } },
     async (request, reply) => {
       const { provider }           = request.params;
       const { code, state, error } = request.query;
