@@ -1,22 +1,13 @@
 # CI/CD pipeline for Conduit Backend
 # Builds + type-checks server (CI), then triggers Dokploy to build+deploy from source
 #
-# Architecture:
-#   Bun build check -> trigger Dokploy source-deploy via REST API
+# Required secrets:
+#   DOKPLOY_TOKEN    - Dokploy API token
 #
-# Dokploy is configured to build the Docker image directly from the GitHub repo.
-# Dokploy clones the repo and builds the Docker image on the server.
-#
-# Dokploy exposes a REST API via trpc-openapi at /api/{procedure}.
-# The deploy endpoint is POST /api/application.deploy with body {"applicationId":"..."}
-# Auth: x-api-key header with a Better Auth API key.
-#
-# Required repository secrets:
-#   DOKPLOY_TOKEN    - Dokploy API token (Settings -> API -> Generate token)
-#
-# Required repository variables:
+# Required variables:
+#   DOKPLOY_API_URL  - Dokploy API base URL (e.g. https://dokploy.example.com/api)
 #   DOKPLOY_APP_ID   - Dokploy application ID for the conduit-api service
-#   DEPLOY_BACKEND   - Set to 'true' to enable Dokploy source deploy
+#   DEPLOY_BACKEND   - Set to 'true' to enable Dokploy deploy
 
 name: Deploy Backend
 
@@ -39,9 +30,6 @@ permissions: {}
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  DOKPLOY_API: "https://dokploy.ms-mvp.com/api"
 
 jobs:
   build-backend:
@@ -76,14 +64,15 @@ jobs:
           && github.ref == 'refs/heads/main'
         env:
           DOKPLOY_TOKEN: ${{ secrets.DOKPLOY_TOKEN }}
+          DOKPLOY_API_URL: ${{ vars.DOKPLOY_API_URL }}
           DOKPLOY_APP_ID: ${{ vars.DOKPLOY_APP_ID }}
         run: |
           HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
             --max-time 30 \
-            -X POST "${DOKPLOY_API}/application.deploy" \
+            -X POST "${DOKPLOY_API_URL}/application.deploy" \
             -H "x-api-key: ${DOKPLOY_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{\"applicationId\":\"${DOKPLOY_APP_ID}\"}") \
+            -d "{\"applicationId\":\"${DOKPLOY_APP_ID}\"}")
 
           echo "HTTP status: ${HTTP_STATUS}"
           echo "Response body:"
