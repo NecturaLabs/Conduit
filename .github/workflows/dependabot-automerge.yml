@@ -1,0 +1,76 @@
+# Automatically approve and squash-merge Dependabot patch-level PRs.
+#
+# SECURITY: This workflow intentionally uses `pull_request` (NOT `pull_request_target`).
+#
+# `pull_request_target` runs with write permissions against the base branch and can
+# access repository secrets — making it exploitable via "poison PR" attacks when the
+# repo is public, because the `github.actor == 'dependabot[bot]'` guard can be spoofed
+# by a fork PR that Dependabot rebases or re-opens.
+#
+# Instead we use the standard `pull_request` event, which runs sandboxed in the fork's
+# context. GitHub automatically grants Dependabot PRs elevated permissions via the
+# dedicated `dependabot` event scope, so `gh pr review` and `gh pr merge` still work
+# without needing `pull_request_target`.
+#
+# Flow:
+#   1. Triggered when Dependabot opens/reopens/syncs a PR.
+#   2. Fetches Dependabot metadata (update type, package ecosystem).
+#   3. Approves the PR (patch only).
+#   4. Merges with squash, retrying up to 5 times to handle transient
+#      GitHub API errors (e.g. 405 when the base branch was modified by
+#      another concurrent Dependabot merge).
+
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-approve and merge
+    runs-on: ubuntu-latest
+    # Only run for Dependabot PRs. With `pull_request` (not `pull_request_target`),
+    # this actor check is safe — it cannot be spoofed by a fork contributor.
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Approve PR (patch only)
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        run: gh pr review "$PR_URL" --approve
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Retry up to 5 times with a 15-second back-off to handle transient
+      # GitHub API errors (e.g. 405 "Base branch was modified" when several
+      # Dependabot PRs are merged in quick succession).
+      - name: Merge PR (patch only, with retry)
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        run: |
+          for attempt in 1 2 3 4 5; do
+            echo "Merge attempt $attempt…"
+            if gh pr merge "$PR_URL" --squash --delete-branch; then
+              echo "Merged successfully."
+              exit 0
+            fi
+            if [ $attempt -lt 5 ]; then
+              echo "Merge failed, retrying in 15 seconds…"
+              sleep 15
+            fi
+          done
+          echo "All merge attempts failed."
+          exit 1
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

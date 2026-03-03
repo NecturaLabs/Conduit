@@ -1,0 +1,16 @@
+[data-theme='frost'] {
+  --color-base: #f1f5fb;
+  --color-surface: #ffffff;
+  --color-surface-hover: #e8eef8;
+  --color-surface-alt: #e6edfb;
+  --color-border: #c8d5e8;
+  --color-text: #0e1726;
+  --color-muted: #5c6b82;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-solid: #2563eb;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

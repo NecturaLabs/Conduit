@@ -1,0 +1,16 @@
+[data-theme='neon'] {
+  --color-base: #050410;
+  --color-surface: #0c0a18;
+  --color-surface-hover: #181428;
+  --color-surface-alt: #12102a;
+  --color-border: #282044;
+  --color-text: #e8e4ff;
+  --color-muted: #7a70a0;
+  --color-accent: #00e5ff;
+  --color-accent-hover: #40f0ff;
+  --color-accent-solid: #00e5ff;
+  --color-danger: #ff2060;
+  --color-success: #00ff88;
+  --color-warning: #ffe030;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

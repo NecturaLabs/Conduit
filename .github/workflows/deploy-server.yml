@@ -1,0 +1,92 @@
+# CI/CD pipeline for Conduit Backend
+# Builds + type-checks server (CI), then triggers Dokploy to build+deploy from source
+#
+# Architecture:
+#   Bun build check → trigger Dokploy source-deploy via API
+#
+# Dokploy is configured to build the Docker image directly from the GitHub repo.
+# Dokploy clones the repo and builds the Docker image on the server.
+#
+# Required repository secrets:
+#   DOKPLOY_TOKEN    - Dokploy API token (Settings → API → Generate token)
+#   DOKPLOY_API_URL  - Dokploy API base URL (e.g. https://dokploy.example.com/api)
+#
+# Required repository variables:
+#   DOKPLOY_APP_ID   - Dokploy application ID for the conduit-api service
+#   DEPLOY_BACKEND   - Set to 'true' to enable Dokploy source deploy
+#
+# Optional repository variables:
+#   TRUSTED_ACTORS   - Comma-separated GitHub usernames to use self-hosted runners
+#                      (e.g. 'Nectura'). All other actors use ubuntu-latest.
+
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/server/**'
+      - 'packages/shared/**'
+      - '.github/workflows/deploy-server.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/server/**'
+      - 'packages/shared/**'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-backend:
+    if: "!(github.actor == 'dependabot[bot]' && github.event_name == 'pull_request')"
+    name: Backend — Build & Deploy
+    runs-on: ${{ contains(format(',{0},', vars.TRUSTED_ACTORS), format(',{0},', github.actor)) && 'self-hosted' || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build shared package
+        run: bun run build --filter=@conduit/shared
+
+      - name: Type-check server
+        working-directory: apps/server
+        run: bun run typecheck
+
+      - name: Trigger Dokploy source-deploy
+        if: >-
+          vars.DEPLOY_BACKEND == 'true'
+          && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/main'
+        env:
+          DOKPLOY_TOKEN: ${{ secrets.DOKPLOY_TOKEN }}
+          DOKPLOY_API: ${{ secrets.DOKPLOY_API_URL }}
+          DOKPLOY_APP_ID: ${{ vars.DOKPLOY_APP_ID }}
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            -X POST "${DOKPLOY_API}/application.deploy" \
+            -H "x-api-key: ${DOKPLOY_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"applicationId\":\"${DOKPLOY_APP_ID}\"}")
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Dokploy source-deploy triggered (HTTP $HTTP_STATUS)"
+          else
+            echo "::error::Dokploy deploy failed (HTTP $HTTP_STATUS)"
+            exit 1
+          fi

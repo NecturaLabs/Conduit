@@ -1,0 +1,157 @@
+# Publish @conduit-ai/mcp-server to npm
+#
+# Triggers on push to main when packages/mcp-server/** changes.
+# Skips publish if the version in package.json already exists on npm.
+#
+# Required repository secrets:
+#   NPM_TOKEN - npm automation token with publish access to @conduit-ai scope
+
+name: Publish MCP Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/mcp-server/**'
+      - 'packages/shared/**'
+      - '.github/workflows/publish-mcp-server.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to push auto-incremented version commit
+  id-token: write  # required for npm --provenance (OIDC attestation)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: "!(github.actor == 'dependabot[bot]' && github.event_name == 'pull_request')"
+    name: Build & Publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2'
+
+      # Install in the monorepo root so workspace:* deps resolve correctly.
+      # bun build inlines @conduit/shared into the dist bundle.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # Auto-increment patch version if the current version is already on npm.
+      # Keeps bumping until it finds a version that hasn't been published yet,
+      # then commits the updated package.json back to main so subsequent runs
+      # always start from a fresh version.
+      - name: Auto-increment version if needed
+        id: auto-bump
+        run: |
+          cd packages/mcp-server
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          CURRENT=$(node -p "require('./package.json').version")
+          VERSION="$CURRENT"
+
+          while true; do
+            PUBLISHED=$(npm view "$PACKAGE_NAME@$VERSION" version 2>/dev/null || echo "")
+            if [ "$PUBLISHED" != "$VERSION" ]; then
+              break
+            fi
+            # Bump patch with semver rollover (0.1.9 → 0.2.0, 0.9.9 → 1.0.0)
+            VERSION=$(node -p "
+              let [maj, min, patch] = '$VERSION'.split('.').map(Number);
+              patch++;
+              if (patch > 9) { patch = 0; min++; }
+              if (min > 9)   { min = 0;   maj++; }
+              [maj, min, patch].join('.')
+            ")
+          done
+
+          if [ "$VERSION" != "$CURRENT" ]; then
+            echo "Bumping $PACKAGE_NAME from $CURRENT → $VERSION"
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              pkg.version = '$VERSION';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add package.json
+            git commit --no-gpg-sign -m "chore(mcp-server): bump version to $VERSION [skip ci]"
+            git push
+          else
+            echo "$PACKAGE_NAME@$VERSION not yet on npm — no bump needed"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: bun run build
+        working-directory: packages/mcp-server
+
+      # Copy built artifacts to an isolated directory for npm publish.
+      # This avoids npm seeing the monorepo root and workspace:* references.
+      - name: Prepare publish directory
+        run: |
+          mkdir -p /tmp/mcp-publish
+          cp packages/mcp-server/package.json /tmp/mcp-publish/
+          cp -r packages/mcp-server/dist /tmp/mcp-publish/
+
+          # Strip workspace:* devDependencies and prepublishOnly script —
+          # npm can't resolve workspace deps and the build already ran above.
+          node -e "
+            const pkg = require('./packages/mcp-server/package.json');
+            delete pkg.devDependencies;
+            delete pkg.scripts.prepublishOnly;
+            require('fs').writeFileSync(
+              '/tmp/mcp-publish/package.json',
+              JSON.stringify(pkg, null, 2) + '\n'
+            );
+          "
+
+      - name: Check if version already published
+        id: version-check
+        working-directory: /tmp/mcp-publish
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          # Use the version resolved (and potentially bumped) in auto-bump step
+          PACKAGE_VERSION="${{ steps.auto-bump.outputs.version }}"
+          echo "name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+
+          PUBLISHED=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null || echo "")
+          if [ "$PUBLISHED" = "$PACKAGE_VERSION" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION already published — skipping"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION not found on npm — will publish"
+          fi
+
+      - name: Publish to npm
+        if: steps.version-check.outputs.exists == 'false'
+        working-directory: /tmp/mcp-publish
+        # --provenance requires a public source repo; omitted for private repos.
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.version-check.outputs.exists }}" = "true" ]; then
+            echo "### Skipped - ${{ steps.version-check.outputs.name }}@${{ steps.version-check.outputs.version }} already on npm" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Published ${{ steps.version-check.outputs.name }}@${{ steps.version-check.outputs.version }} to npm" >> $GITHUB_STEP_SUMMARY
+          fi

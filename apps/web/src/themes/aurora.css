@@ -1,0 +1,16 @@
+[data-theme='aurora'] {
+  --color-base: #08060f;
+  --color-surface: #120e24;
+  --color-surface-hover: #1c1638;
+  --color-surface-alt: #181230;
+  --color-border: #2e2258;
+  --color-text: #e8e0ff;
+  --color-muted: #8878b5;
+  --color-accent: #a78bfa;
+  --color-accent-hover: #c4b5fd;
+  --color-accent-solid: #a78bfa;
+  --color-danger: #fb7185;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

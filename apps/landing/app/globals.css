@@ -1,0 +1,135 @@
+@import 'tailwindcss';
+
+/* ── Midnight Theme (landing page default) ── */
+:root,
+[data-theme='midnight'] {
+  --color-base: #0b0f18;
+  --color-surface: #131926;
+  --color-border: #253044;
+  --color-text: #e8edf5;
+  --color-muted: #6b7a94;
+  --color-accent: #5b9ef5;
+  --color-accent-hover: #82b8ff;
+  --color-accent-solid: #5b9ef5;
+  --color-danger: #f85149;
+  --color-success: #3fb950;
+  --color-warning: #d29922;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Theme utility classes ── */
+@theme {
+  --color-base: var(--color-base);
+  --color-surface: var(--color-surface);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-muted: var(--color-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-solid: var(--color-accent-solid);
+  --color-danger: var(--color-danger);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+}
+
+/* ── Base styles ── */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-base);
+  background-color: var(--color-base);
+  color: var(--color-text);
+}
+
+::selection {
+  background-color: var(--color-accent);
+  color: var(--color-base);
+}
+
+/* ── Scroll-triggered fade-in animation (CSS-only, no JS required) ── */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-section {
+  animation: fade-in-up 0.7s ease-out both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 40%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-section {
+    animation: none;
+  }
+}
+
+/* ── Gradient text utility ── */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-accent), #a78bfa, var(--color-accent-hover));
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 6s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ── Card glow on hover ── */
+.card-glow {
+  position: relative;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.card-glow:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 24px -4px color-mix(in srgb, var(--color-accent) 25%, transparent);
+  transform: translateY(-2px);
+}
+
+/* ── Terminal code effect for hero ── */
+.hero-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-border) 30%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border) 30%, transparent) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 70% 50% at 50% 50%, black 20%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 50%, black 20%, transparent 100%);
+}
+
+/* ── Glow dot animation ── */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* ── Pricing card popular ring ── */
+.popular-ring {
+  box-shadow:
+    0 0 0 1px var(--color-accent),
+    0 0 40px -8px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* ── Navbar backdrop ── */
+.nav-blur {
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}

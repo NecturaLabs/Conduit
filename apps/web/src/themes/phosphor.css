@@ -1,0 +1,16 @@
+[data-theme='phosphor'] {
+  --color-base: #010a01;
+  --color-surface: #081808;
+  --color-surface-hover: #0e240e;
+  --color-surface-alt: #0a2010;
+  --color-border: #1a4020;
+  --color-text: #88f088;
+  --color-muted: #5a9a5a;
+  --color-accent: #4ade80;
+  --color-accent-hover: #86efac;
+  --color-accent-solid: #4ade80;
+  --color-danger: #ff4444;
+  --color-success: #00ff41;
+  --color-warning: #ffaa00;
+  --font-base: 'JetBrains Mono', monospace;
+}

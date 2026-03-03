@@ -1,0 +1,16 @@
+[data-theme='ocean'] {
+  --color-base: #030a14;
+  --color-surface: #071828;
+  --color-surface-hover: #0e253e;
+  --color-surface-alt: #0c2038;
+  --color-border: #163a5e;
+  --color-text: #d0e6f8;
+  --color-muted: #5590bb;
+  --color-accent: #0ea5e9;
+  --color-accent-hover: #38bdf8;
+  --color-accent-solid: #0ea5e9;
+  --color-danger: #f43f5e;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

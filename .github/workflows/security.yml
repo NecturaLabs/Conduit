@@ -1,0 +1,74 @@
+# Security scanning workflow
+#
+# Runs on every push to main and on PRs, plus weekly on a schedule.
+# Performs:
+#   1. Dependency audit via `bun audit` (fails on critical/high)
+#   2. CodeQL static analysis (TypeScript/JavaScript)
+#      Note: SARIF upload requires GitHub Advanced Security on private repos.
+#      The CodeQL job continues-on-error so it does not block merges when
+#      Advanced Security is not enabled.
+
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write  # required to upload SARIF results to GitHub Security tab
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Audit dependencies
+        # `bun audit` exits non-zero when vulnerabilities are found.
+        # Fail the job on critical or high severity findings.
+        run: bun audit --audit-level high
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    # continue-on-error: SARIF upload fails on private repos without GitHub Advanced Security.
+    # This keeps CodeQL as best-effort — it won't block PRs but will show in the Actions log.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:javascript-typescript'

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Blue rounded square background -->
+  <rect width="32" height="32" rx="7" fill="#58a6ff"/>
+  <!-- Lucide Zap path, scaled/centered from 24x24 to fit in ~18x18 at center -->
+  <!-- Original Zap: M13 2L3 14h9l-1 8 10-12h-9l1-8z -->
+  <g transform="translate(7, 6) scale(0.75)">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#0d1117" stroke="#0d1117" stroke-width="0.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

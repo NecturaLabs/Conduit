@@ -1,0 +1,16 @@
+[data-theme='copper'] {
+  --color-base: #0a0704;
+  --color-surface: #18100a;
+  --color-surface-hover: #261a12;
+  --color-surface-alt: #20160e;
+  --color-border: #402c1e;
+  --color-text: #f0dcc8;
+  --color-muted: #a08878;
+  --color-accent: #d4885a;
+  --color-accent-hover: #e8a478;
+  --color-accent-solid: #d4885a;
+  --color-danger: #e85050;
+  --color-success: #5cb870;
+  --color-warning: #e8b04a;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

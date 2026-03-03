@@ -1,0 +1,17 @@
+:root,
+[data-theme='midnight'] {
+  --color-base: #080c14;
+  --color-surface: #111827;
+  --color-surface-hover: #1a2236;
+  --color-surface-alt: #151e35;
+  --color-border: #263352;
+  --color-text: #e8edf5;
+  --color-muted: #6b7a94;
+  --color-accent: #5b9ef5;
+  --color-accent-hover: #7eb8ff;
+  --color-accent-solid: #5b9ef5;
+  --color-danger: #f85149;
+  --color-success: #3fb950;
+  --color-warning: #e3a420;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

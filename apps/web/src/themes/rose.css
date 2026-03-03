@@ -1,0 +1,16 @@
+[data-theme='rose'] {
+  --color-base: #0c0406;
+  --color-surface: #1a0a10;
+  --color-surface-hover: #2a101e;
+  --color-surface-alt: #220e18;
+  --color-border: #421a2c;
+  --color-text: #fde8f0;
+  --color-muted: #a05070;
+  --color-accent: #f43f5e;
+  --color-accent-hover: #fb7185;
+  --color-accent-solid: #f43f5e;
+  --color-danger: #ff6b35;
+  --color-success: #22c55e;
+  --color-warning: #fbbf24;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

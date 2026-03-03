@@ -1,0 +1,16 @@
+[data-theme='sakura'] {
+  --color-base: #fdf4f6;
+  --color-surface: #ffffff;
+  --color-surface-hover: #fcedf2;
+  --color-surface-alt: #fce8ef;
+  --color-border: #ecc8d4;
+  --color-text: #1a0810;
+  --color-muted: #8c6070;
+  --color-accent: #e8457a;
+  --color-accent-hover: #d63568;
+  --color-accent-solid: #e8457a;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #ca8a04;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

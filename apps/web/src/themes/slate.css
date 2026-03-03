@@ -1,0 +1,16 @@
+[data-theme='slate'] {
+  --color-base: #0e1012;
+  --color-surface: #181c20;
+  --color-surface-hover: #24282e;
+  --color-surface-alt: #1e2430;
+  --color-border: #323a42;
+  --color-text: #e0e4e8;
+  --color-muted: #7a828c;
+  --color-accent: #7b9fc4;
+  --color-accent-hover: #9bb8d8;
+  --color-accent-solid: #7b9fc4;
+  --color-danger: #e55050;
+  --color-success: #40b060;
+  --color-warning: #d4a030;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

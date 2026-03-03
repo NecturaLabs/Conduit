@@ -1,0 +1,16 @@
+[data-theme='cobalt'] {
+  --color-base: #04060e;
+  --color-surface: #0a1020;
+  --color-surface-hover: #141e38;
+  --color-surface-alt: #10182e;
+  --color-border: #202e58;
+  --color-text: #dce6ff;
+  --color-muted: #6678aa;
+  --color-accent: #4c6ef5;
+  --color-accent-hover: #6b8aff;
+  --color-accent-solid: #4c6ef5;
+  --color-danger: #f03e3e;
+  --color-success: #12b886;
+  --color-warning: #f59f00;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}

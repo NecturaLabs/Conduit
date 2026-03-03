@@ -1,0 +1,16 @@
+[data-theme='ember'] {
+  --color-base: #0c0602;
+  --color-surface: #1a0e06;
+  --color-surface-hover: #28180c;
+  --color-surface-alt: #221408;
+  --color-border: #40281a;
+  --color-text: #f8ddc5;
+  --color-muted: #b08050;
+  --color-accent: #f97316;
+  --color-accent-hover: #fb923c;
+  --color-accent-solid: #f97316;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+  --color-warning: #fbbf24;
+  --font-base: 'Inter', system-ui, -apple-system, sans-serif;
+}
