@@ -1,6 +1,6 @@
 {
   "name": "@conduit-ai/mcp-server",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "description": "Conduit MCP server — universal AI coding agent integration. Monitor sessions, relay prompts, track metrics from any MCP-compatible client.",
   "type": "module",
   "bin": {
