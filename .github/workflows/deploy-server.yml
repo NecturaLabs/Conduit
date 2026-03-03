@@ -2,13 +2,13 @@
 # Builds + type-checks server (CI), then triggers Dokploy to build+deploy from source
 #
 # Architecture:
-#   Bun build check → trigger Dokploy source-deploy via API
+#   Bun build check -> trigger Dokploy source-deploy via tRPC API
 #
 # Dokploy is configured to build the Docker image directly from the GitHub repo.
 # Dokploy clones the repo and builds the Docker image on the server.
 #
 # Required repository secrets:
-#   DOKPLOY_TOKEN    - Dokploy API token (Settings → API → Generate token)
+#   DOKPLOY_TOKEN    - Dokploy API token (Settings -> API -> Generate token)
 #   DOKPLOY_API_URL  - Dokploy API base URL (e.g. https://dokploy.example.com/api)
 #
 # Required repository variables:
@@ -40,13 +40,13 @@ concurrency:
 jobs:
   build-backend:
     if: "!(github.actor == 'dependabot[bot]' && github.event_name == 'pull_request')"
-    name: Backend — Build & Deploy
+    name: Backend - Build & Deploy
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -74,16 +74,22 @@ jobs:
           DOKPLOY_API: ${{ secrets.DOKPLOY_API_URL }}
           DOKPLOY_APP_ID: ${{ vars.DOKPLOY_APP_ID }}
         run: |
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          # Dokploy uses tRPC. The deploy mutation is at /api/trpc/application.deploy
+          # and expects a tRPC batch body: [{"applicationId":"..."}]
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
             --max-time 30 \
-            -X POST "${DOKPLOY_API}/application.deploy" \
+            -X POST "${DOKPLOY_API}/trpc/application.deploy" \
             -H "x-api-key: ${DOKPLOY_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{\"applicationId\":\"${DOKPLOY_APP_ID}\"}")
+            -d "[{\"applicationId\":\"${DOKPLOY_APP_ID}\"}]")
+
+          echo "HTTP status: ${HTTP_STATUS}"
+          echo "Response body:"
+          cat response.json || true
 
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            echo "Dokploy source-deploy triggered (HTTP $HTTP_STATUS)"
+            echo "Dokploy deploy triggered successfully (HTTP ${HTTP_STATUS})"
           else
-            echo "::warning::Dokploy deploy returned HTTP $HTTP_STATUS — the build/type-check succeeded but the deploy trigger failed. Check Dokploy configuration."
+            echo "::warning::Dokploy deploy returned HTTP ${HTTP_STATUS} - build passed but deploy trigger failed. Check Dokploy logs."
             exit 1
           fi
