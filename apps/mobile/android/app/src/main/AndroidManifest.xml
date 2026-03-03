@@ -22,13 +22,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Custom scheme deep link: intercept conduit:// magic link callbacks -->
-            <!-- conduit://auth/verify?token=... is sent by the server when mobile=true -->
-            <intent-filter>
+            <!-- Android App Links: intercept https://conduit-api.ms-mvp.com/app/auth/verify?token=... -->
+            <!-- autoVerify=true causes Android to verify ownership via /.well-known/assetlinks.json -->
+            <!-- This allows magic link emails to open the app directly in all email clients -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="conduit" />
+                <data
+                    android:scheme="https"
+                    android:host="conduit-api.ms-mvp.com"
+                    android:pathPrefix="/app/auth/verify" />
             </intent-filter>
 
         </activity>

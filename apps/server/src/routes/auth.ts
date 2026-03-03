@@ -32,9 +32,6 @@ import {
 
 const magicLinkSchema = z.object({
   email: z.string().email().max(254),
-  // Optional deep-link callback for mobile clients. Strictly validated to
-  // conduit:// scheme only — prevents open redirect abuse.
-  callbackUrl: z.string().regex(/^conduit:\/\/[^\s]+$/).optional(),
 });
 
 // Grace window for refresh token reuse detection.
@@ -47,7 +44,7 @@ const REFRESH_REUSE_GRACE_SECONDS = 10;
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   // POST /auth/magic-link
-  fastify.post<{ Body: { email: string; callbackUrl?: string } }>(
+  fastify.post<{ Body: { email: string } }>(
     '/magic-link',
     {
       config: {
@@ -72,7 +69,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.code(400).send(error);
       }
 
-      const { email, callbackUrl } = parsed.data;
+      const { email } = parsed.data;
       const db = fastify.db;
 
       // Always generate token regardless of whether user exists (prevent enumeration)
@@ -86,9 +83,9 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       `).run(id, hash, email.toLowerCase(), expiresAt, request.ip);
 
       // Fire-and-forget — never expose whether email was actually sent.
-      // callbackUrl is only set by mobile clients (conduit:// scheme, validated above)
-      // so the link opens the app directly instead of the browser.
-      sendMagicLink(email.toLowerCase(), raw, config.appUrl, request.log, callbackUrl);
+      // The link always uses the server's default https:// URL so App Links
+      // on Android can intercept it and open the app directly.
+      sendMagicLink(email.toLowerCase(), raw, config.appUrl, request.log);
 
       // Always identical response regardless of email existence
       const response: MagicLinkResponse = {

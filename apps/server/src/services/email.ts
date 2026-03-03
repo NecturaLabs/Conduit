@@ -23,14 +23,8 @@ export async function sendMagicLink(
   token: string,
   appUrl: string,
   logger: MinimalLogger = fallbackLogger,
-  /** Optional deep-link base URL (e.g. conduit://auth/verify). When provided,
-   *  this is used instead of appUrl so mobile clients open the app directly.
-   *  Only conduit:// scheme is accepted — validated by the caller. */
-  callbackUrl?: string,
 ): Promise<void> {
-  const verifyUrl = callbackUrl
-    ? `${callbackUrl}?token=${encodeURIComponent(token)}`
-    : `${appUrl}/app/auth/verify?token=${encodeURIComponent(token)}`;
+  const verifyUrl = `${appUrl}/app/auth/verify?token=${encodeURIComponent(token)}`;
 
   const html = `
 <!DOCTYPE html>

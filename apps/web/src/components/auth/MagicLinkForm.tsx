@@ -6,8 +6,6 @@ import { Spinner } from '@/components/ui/Spinner';
 import { api } from '@/lib/api';
 import type { MagicLinkResponse } from '@conduit/shared';
 
-const isMobile = Boolean(import.meta.env.VITE_MOBILE);
-
 export function MagicLinkForm() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -25,7 +23,6 @@ export function MagicLinkForm() {
     try {
       await api.postPublic<MagicLinkResponse>('/auth/magic-link', {
         email,
-        ...(isMobile && { callbackUrl: 'conduit://auth/verify' }),
       });
       setStatus('success');
     } catch (err) {
