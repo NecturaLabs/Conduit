@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { ApiError, ApiSuccess, Instance } from '@conduit/shared';
 import { requireAuth, requireCsrf } from '../middleware/auth.js';
 import { resolveHookTokenUser } from '../middleware/hook-auth.js';
-import { normalizeTs } from '../lib/db-helpers.js';
+import { normalizeTs, resolveFallbackUserId } from '../lib/db-helpers.js';
 import * as opencode from '../services/opencode.js';
 import { validateUrlNotPrivate } from '../services/url-validation.js';
 import { eventBus } from '../services/eventbus.js';
@@ -176,6 +176,10 @@ export async function instanceRegisterRoute(fastify: FastifyInstance): Promise<v
       const { name, type, url, version, mcpServerVersion } = parsed.data;
       const db = fastify.db;
 
+      // For legacy global tokens (hookUserId=null), resolve the single user in the
+      // system so that registered instances are visible in the dashboard.
+      const effectiveUserId = hookUserId ?? resolveFallbackUserId(db);
+
       // Version info is dynamic — store in-memory only, not persisted to DB.
 
       // SSRF protection: validate that the instance URL doesn't point to private networks.
@@ -196,10 +200,10 @@ export async function instanceRegisterRoute(fastify: FastifyInstance): Promise<v
 
       // If instance with same URL already exists (scoped to user), update it
       if (url) {
-        const existingQuery = hookUserId
+        const existingQuery = effectiveUserId
           ? 'SELECT * FROM instances WHERE url = ? AND user_id = ?'
           : 'SELECT * FROM instances WHERE url = ?';
-        const existingParams = hookUserId ? [url, hookUserId] : [url];
+        const existingParams = effectiveUserId ? [url, effectiveUserId] : [url];
         const existing = db.query(existingQuery).get(...existingParams) as Record<string, unknown> | undefined;
         if (existing) {
           db.query(`
@@ -220,10 +224,10 @@ export async function instanceRegisterRoute(fastify: FastifyInstance): Promise<v
 
       // No URL provided — match by type + user to avoid creating duplicate instances
       // on every agent restart (e.g. OpenCode plugin calling register on startup).
-      if (hookUserId) {
+      if (effectiveUserId) {
         const existing = db.query(
           `SELECT * FROM instances WHERE type = ? AND user_id = ? ORDER BY last_seen DESC LIMIT 1`,
-        ).get(type, hookUserId) as Record<string, unknown> | undefined;
+        ).get(type, effectiveUserId) as Record<string, unknown> | undefined;
         if (existing) {
           db.query(
             `UPDATE instances SET name = ?, status = 'connected', last_seen = datetime('now') WHERE id = ?`,
@@ -243,7 +247,7 @@ export async function instanceRegisterRoute(fastify: FastifyInstance): Promise<v
       db.query(`
         INSERT INTO instances (id, name, type, url, user_id, status, last_seen, created_at)
         VALUES (?, ?, ?, ?, ?, 'connected', datetime('now'), datetime('now'))
-      `).run(id, name, type, url ?? null, hookUserId);
+      `).run(id, name, type, url ?? null, effectiveUserId);
 
       setInstanceVersions(id, version, mcpServerVersion);
 

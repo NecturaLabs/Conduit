@@ -11,6 +11,7 @@ import { resolveHookTokenUser, extractBearerToken } from '../middleware/hook-aut
 import { emitInstanceUpdated } from './instances.js';
 import { createHash } from 'node:crypto';
 import { pricingService } from '../services/pricing.js';
+import { resolveFallbackUserId } from '../lib/db-helpers.js';
 
 const REPLAY_WINDOW_MS = 5 * 60 * 1000; // ±5 minutes
 
@@ -782,6 +783,9 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
       const payload = parsed.data as HookPayload;
       const eventId = randomUUID();
       const db = fastify.db;
+      // For legacy global tokens (hookUserId=null), resolve the single user in the
+      // system so that instances and events are visible in the dashboard.
+      const effectiveUserId = hookUserId ?? resolveFallbackUserId(db);
 
       // 5. Resolve instance_id — use instance type that matches the event source
       const CONDUIT_INTERNAL_EVENTS = new Set(['config.sync', 'models.sync']);
@@ -806,7 +810,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
       let instanceRow: { id: string } | undefined;
       const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : null;
 
-      if (hookUserId) {
+      if (effectiveUserId) {
         // 1. Session-scoped lookup (avoids multi-machine collision)
         if (sessionId && sessionId !== 'conduit-config' && sessionId !== 'conduit-models' && sessionId !== 'unknown') {
           instanceRow = db.query(`
@@ -814,16 +818,16 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
             WHERE session_id = ?
               AND instance_id IN (SELECT id FROM instances WHERE type = ? AND user_id = ?)
             ORDER BY received_at DESC LIMIT 1
-          `).get(sessionId, instanceType, hookUserId) as { id: string } | undefined;
+          `).get(sessionId, instanceType, effectiveUserId) as { id: string } | undefined;
         }
         // 2. Fallback: most-recently-seen instance of the correct type
         if (!instanceRow) {
           instanceRow = db.query(`
             SELECT id FROM instances WHERE type = ? AND user_id = ? ORDER BY last_seen DESC LIMIT 1
-          `).get(instanceType, hookUserId) as { id: string } | undefined;
+          `).get(instanceType, effectiveUserId) as { id: string } | undefined;
         }
       } else {
-        // Legacy global token: match any instance (backward compat)
+        // Legacy global token with multiple users: match any instance (backward compat)
         if (sessionId && sessionId !== 'conduit-config' && sessionId !== 'conduit-models' && sessionId !== 'unknown') {
           instanceRow = db.query(`
             SELECT instance_id as id FROM hook_events
@@ -845,7 +849,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
         db.query(`
           INSERT INTO instances (id, name, type, user_id, status, last_seen, created_at)
           VALUES (?, ?, ?, ?, 'connected', datetime('now'), datetime('now'))
-        `).run(newInstanceId, instanceType === 'opencode' ? 'OpenCode' : 'Claude Code', instanceType, hookUserId);
+        `).run(newInstanceId, instanceType === 'opencode' ? 'OpenCode' : 'Claude Code', instanceType, effectiveUserId);
         instanceRow = { id: newInstanceId };
       }
 
@@ -867,7 +871,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
       `).run(eventId, instanceId, payload.event, payload.sessionId, JSON.stringify(payload.data));
 
       // 5c-bis. Update pre-aggregated metrics counters
-      if (hookUserId) {
+      if (effectiveUserId) {
         const aggregator = fastify.metricsAggregator;
         const eventType = payload.event as string;
         const data = payload.data as Record<string, unknown>;
@@ -876,7 +880,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
         if (eventType === 'message.updated') {
           const info = data['info'] as Record<string, unknown> | undefined;
           const msgId = (info?.['id'] as string) ?? (data['id'] as string) ?? eventId;
-          aggregator.trackMessage(hookUserId, instanceId, msgId);
+          aggregator.trackMessage(effectiveUserId, instanceId, msgId);
 
           // Token/cost tracking — only for assistant messages
           const role = info?.['role'] as string | undefined;
@@ -897,9 +901,9 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
                 reasoning,
                 cache: { read: cacheObj?.['read'], write: cacheObj?.['write'] },
               }).then((cost) => {
-                aggregator.trackTokensAndCost(hookUserId, instanceId, msgId, totalTokens, cost);
+                aggregator.trackTokensAndCost(effectiveUserId, instanceId, msgId, totalTokens, cost);
               }).catch(() => {
-                aggregator.trackTokensAndCost(hookUserId, instanceId, msgId, totalTokens, 0);
+                aggregator.trackTokensAndCost(effectiveUserId, instanceId, msgId, totalTokens, 0);
               });
             }
           }
@@ -907,7 +911,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
 
         // Message tracking — Claude Code: UserPromptSubmit fires once per user prompt
         if (eventType === 'UserPromptSubmit') {
-          aggregator.trackMessage(hookUserId, instanceId, eventId);
+          aggregator.trackMessage(effectiveUserId, instanceId, eventId);
         }
 
         // Tool call tracking — OpenCode: message.part.updated with part.type="tool".
@@ -919,7 +923,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
             const state = part['state'] as Record<string, unknown> | undefined;
             if (state?.['status'] === 'pending') {
               const callId = (part['callID'] as string) ?? eventId;
-              aggregator.trackToolCall(hookUserId, instanceId, callId);
+              aggregator.trackToolCall(effectiveUserId, instanceId, callId);
             }
           }
         }
@@ -928,7 +932,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
         // PreToolUse is skipped to avoid double-counting (PostToolUse fires for every completed call)
         // tool.execute.after is skipped — message.part.updated status=pending already covers OpenCode
         if (eventType === 'PostToolUse') {
-          aggregator.trackToolCall(hookUserId, instanceId, eventId);
+          aggregator.trackToolCall(effectiveUserId, instanceId, eventId);
         }
       }
 
@@ -1100,6 +1104,9 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
       }
 
       const db = fastify.db;
+      // For legacy global tokens (hookUserId=null), resolve the single user in the
+      // system so that instances and events are visible in the dashboard.
+      const effectiveUserId = hookUserId ?? resolveFallbackUserId(db);
 
       // 5. Resolve instance_id — detect type from first event (all events in a batch
       //    come from the same agent instance so type is uniform)
@@ -1108,10 +1115,10 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
       const instanceType = isOpenCodeBatch ? 'opencode' : 'claude-code';
 
       let instanceRow: { id: string } | undefined;
-      if (hookUserId) {
+      if (effectiveUserId) {
         instanceRow = db.query(
           `SELECT id FROM instances WHERE type = ? AND user_id = ? ORDER BY last_seen DESC LIMIT 1`,
-        ).get(instanceType, hookUserId) as { id: string } | undefined;
+        ).get(instanceType, effectiveUserId) as { id: string } | undefined;
       } else {
         instanceRow = db.query(
           `SELECT id FROM instances WHERE type = ? ORDER BY last_seen DESC LIMIT 1`,
@@ -1123,7 +1130,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
         db.query(
           `INSERT INTO instances (id, name, type, user_id, status, last_seen, created_at)
            VALUES (?, ?, ?, ?, 'connected', datetime('now'), datetime('now'))`,
-        ).run(newInstanceId, instanceType === 'opencode' ? 'OpenCode' : 'Claude Code', instanceType, hookUserId);
+        ).run(newInstanceId, instanceType === 'opencode' ? 'OpenCode' : 'Claude Code', instanceType, effectiveUserId);
         instanceRow = { id: newInstanceId };
       }
 
@@ -1158,11 +1165,11 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
           insertEvent.run(eventId, instanceId, eventType, payload.sessionId, JSON.stringify(data));
 
           // Metrics tracking — same logic as single endpoint
-          if (hookUserId) {
+          if (effectiveUserId) {
             if (eventType === 'message.updated') {
               const info = data['info'] as Record<string, unknown> | undefined;
               const msgId = (info?.['id'] as string) ?? (data['id'] as string) ?? eventId;
-              aggregator.trackMessage(hookUserId, instanceId, msgId);
+              aggregator.trackMessage(effectiveUserId, instanceId, msgId);
               const role = info?.['role'] as string | undefined;
               if (role === 'assistant') {
                 const tokensObj = info?.['tokens'] as Record<string, unknown> | undefined;
@@ -1182,16 +1189,16 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
                     reasoning,
                     cache: { read: cacheObj?.['read'], write: cacheObj?.['write'] },
                   }).then((cost) => {
-                    aggregator.trackTokensAndCost(hookUserId, instanceId, msgId, totalTokens, cost);
+                    aggregator.trackTokensAndCost(effectiveUserId, instanceId, msgId, totalTokens, cost);
                   }).catch(() => {
-                    aggregator.trackTokensAndCost(hookUserId, instanceId, msgId, totalTokens, 0);
+                    aggregator.trackTokensAndCost(effectiveUserId, instanceId, msgId, totalTokens, 0);
                   });
                 }
               }
             }
 
             if (eventType === 'UserPromptSubmit') {
-              aggregator.trackMessage(hookUserId, instanceId, eventId);
+              aggregator.trackMessage(effectiveUserId, instanceId, eventId);
             }
 
             if (eventType === 'message.part.updated') {
@@ -1200,7 +1207,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
                 const state = part['state'] as Record<string, unknown> | undefined;
                 if (state?.['status'] === 'pending') {
                   const callId = (part['callID'] as string) ?? eventId;
-                  aggregator.trackToolCall(hookUserId, instanceId, callId);
+                  aggregator.trackToolCall(effectiveUserId, instanceId, callId);
                 }
               }
             }
@@ -1208,7 +1215,7 @@ export async function hookRoutes(fastify: FastifyInstance): Promise<void> {
             // PostToolUse only — PreToolUse would double-count, tool.execute.after
             // is already covered by message.part.updated status=pending for OpenCode
             if (eventType === 'PostToolUse') {
-              aggregator.trackToolCall(hookUserId, instanceId, eventId);
+              aggregator.trackToolCall(effectiveUserId, instanceId, eventId);
             }
           }
 

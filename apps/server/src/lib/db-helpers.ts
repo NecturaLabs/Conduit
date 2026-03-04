@@ -5,7 +5,22 @@
  * previously duplicated across multiple route and service files.
  */
 
+import type { Database } from 'bun:sqlite';
 import type { User } from '@conduit/shared';
+
+/**
+ * When a legacy global hook token is used, the hook user ID is null.
+ * For single-user self-hosted deployments, fall back to the one user in the
+ * system so that instances and hook events are associated with that user and
+ * therefore visible in the dashboard.
+ *
+ * Returns null if there are zero users (fresh install, not yet registered) or
+ * multiple users (unsafe to assume which user owns the data).
+ */
+export function resolveFallbackUserId(db: Database): string | null {
+  const rows = db.query(`SELECT id FROM users LIMIT 2`).all() as Array<{ id: string }>;
+  return rows.length === 1 ? (rows[0]?.id ?? null) : null;
+}
 
 /**
  * Normalise SQLite datetime strings ("YYYY-MM-DD HH:MM:SS") to ISO 8601 with
