@@ -444,7 +444,7 @@ if ($event -eq "Stop") {
         if ($lines.Count -gt 0) {
           # Output decision:block JSON — prevents Claude from stopping and
           # feeds the dashboard prompt as the reason to continue.
-          $reason = $lines -join "`n"
+          $reason = $lines -join "\`n"
           $blockJson = [ordered]@{ decision = "block"; reason = $reason } | ConvertTo-Json -Compress
           Write-Output $blockJson
         }
