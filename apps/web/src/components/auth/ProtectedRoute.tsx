@@ -47,10 +47,17 @@ export function ProtectedRoute({ children, requireOnboarding = true }: Protected
   const validatingRef = useRef(false);
   // Whether the initial bootstrap probe (for unauthenticated state) is in progress.
   const [bootstrapping, setBootstrapping] = useState(!isAuthenticated);
+  // Whether the initial session validation (for already-authenticated state) is in progress.
+  // Blocks optimistic render until we've confirmed the session is still valid, preventing
+  // a flash of "User" + empty data when the server has been redeployed and tokens are gone.
+  const [initialValidating, setInitialValidating] = useState(isAuthenticated);
 
-  const validate = useCallback(async () => {
+  const validate = useCallback(async (isInitial = false) => {
     // Skip if not authenticated (nothing to validate) or already in-flight.
-    if (!useAuthStore.getState().isAuthenticated) return;
+    if (!useAuthStore.getState().isAuthenticated) {
+      if (isInitial) setInitialValidating(false);
+      return;
+    }
     if (validatingRef.current) return;
     validatingRef.current = true;
 
@@ -112,6 +119,7 @@ export function ProtectedRoute({ children, requireOnboarding = true }: Protected
       // result === 'error' (transient) — stay authenticated.
     } finally {
       validatingRef.current = false;
+      if (isInitial) setInitialValidating(false);
     }
   }, [clearUser, setUser]);
 
@@ -155,7 +163,7 @@ export function ProtectedRoute({ children, requireOnboarding = true }: Protected
 
   // Run validation on mount (only when already authenticated).
   useEffect(() => {
-    void validate();
+    void validate(true);
   }, [validate]);
 
   // Re-validate when the web tab regains visibility (covers browser + WebView).
@@ -191,6 +199,11 @@ export function ProtectedRoute({ children, requireOnboarding = true }: Protected
 
   // While the bootstrap probe is in flight, render nothing (avoid flash-redirect to /auth).
   if (bootstrapping) return null;
+
+  // Block render until initial validation completes when already authenticated.
+  // Prevents a flash of "User" + empty data if the server was redeployed and
+  // tokens are gone — we need to know the session is valid before showing content.
+  if (initialValidating) return null;
 
   // Optimistic: if persisted state says authenticated, render immediately.
   // Background validation will log out if the session is truly gone.
