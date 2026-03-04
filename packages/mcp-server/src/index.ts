@@ -67,14 +67,15 @@ const INSTANCE_TYPE = detectInstanceType();
 async function detectCliVersion(): Promise<string | null> {
   if (INSTANCE_TYPE === "opencode") {
     const opencodeUrl = process.env["OPENCODE_URL"];
-    if (opencodeUrl) {
+    const candidateUrls = [opencodeUrl, "http://127.0.0.1:4096", "http://localhost:4096"].filter(Boolean) as string[];
+    for (const baseUrl of candidateUrls) {
       try {
-        const res = await fetch(`${opencodeUrl}/global/health`);
+        const res = await fetch(`${baseUrl}/global/health`);
         if (res.ok) {
           const body = await res.json() as { version?: string };
           if (body.version) return body.version;
         }
-      } catch { /* fall through */ }
+      } catch { /* try next */ }
     }
   } else {
     // Claude Code sets CLAUDE_CODE_VERSION in the process environment
@@ -229,7 +230,23 @@ BODY=$(cat)
 [[ -z "$BODY" ]] && exit 0
 
 EVENT=$(printf '%s' "$BODY" | grep -o '"hook_event_name":"[^"]*"' | sed 's/.*:"\\([^"]*\\)".*/\\1/' || echo "PostToolUse")
-SESSION=$(printf '%s' "$BODY" | grep -o '"session_id":"[^"]*"'    | sed 's/.*:"\\([^"]*\\)".*/\\1/' || echo "unknown")
+SESSION=$(python3 - <<'PYEOF' "$BODY"
+import json, sys
+raw = sys.argv[1]
+try:
+    data = json.loads(raw)
+except Exception:
+    print("unknown")
+    sys.exit(0)
+session = data.get("session_id") or data.get("sessionId") or data.get("session")
+if not session:
+    try:
+        session = data.get("session", {}).get("id")
+    except Exception:
+        session = None
+print(session or "unknown")
+PYEOF
+)
 ISO_NOW=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 TS=$(date +%s)000
 
@@ -411,7 +428,11 @@ if (-not $rawBody.Trim()) { exit 0 }
 try { $hook = $rawBody | ConvertFrom-Json } catch { exit 0 }
 
 $event   = if ($hook.hook_event_name) { $hook.hook_event_name } else { "PostToolUse" }
-$session = if ($hook.session_id)      { $hook.session_id }      else { "unknown" }
+$session = if ($hook.session_id)      { $hook.session_id } 
+  elseif ($hook.sessionId)            { $hook.sessionId }
+  elseif ($hook.session)              { $hook.session }
+  elseif ($hook.session.id)           { $hook.session.id }
+  else                                { "unknown" }
 $isoNow  = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
 $ts      = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 
@@ -1432,7 +1453,7 @@ async function main() {
 
   // Register this instance with Conduit so the dashboard shows the correct type
   // immediately, without waiting for the first hook event to auto-create it.
-  const cliVersion = await detectCliVersion();
+  let cliVersion = await detectCliVersion();
   void api("/instances/register", {
     method: "POST",
     body: JSON.stringify({
@@ -1466,6 +1487,11 @@ async function main() {
   // would be marked 'disconnected' by the server health checker.
   // Include the CLI version so it stays current even if detection was slow on startup.
   const heartbeatInterval = setInterval(() => {
+    if (!cliVersion) {
+      void detectCliVersion().then((detected) => {
+        if (detected) cliVersion = detected;
+      }).catch(() => {});
+    }
     void api("/instances/heartbeat", {
       method: "POST",
       body: JSON.stringify({

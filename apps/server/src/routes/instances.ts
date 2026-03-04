@@ -38,8 +38,8 @@ function setInstanceVersions(
   mcpServerVersion: string | null | undefined,
 ): void {
   const existing = instanceVersions.get(instanceId) ?? { version: null, mcpServerVersion: null };
-  if (version !== undefined) existing.version = version;
-  if (mcpServerVersion !== undefined) existing.mcpServerVersion = mcpServerVersion;
+  if (version !== undefined && version !== null) existing.version = version;
+  if (mcpServerVersion !== undefined && mcpServerVersion !== null) existing.mcpServerVersion = mcpServerVersion;
   instanceVersions.set(instanceId, existing);
 }
 

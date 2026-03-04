@@ -133,6 +133,7 @@ function getSessionsFromEvents(
     WHERE se.event_type = 'SessionStart'
       AND se.session_id IS NOT NULL
       AND json_extract(se.payload, '$.parent_session_id') IS NOT NULL
+      AND json_extract(se.payload, '$.parent_session_id') != ''
   )`;
 
   // Count total top-level sessions (for pagination metadata)
