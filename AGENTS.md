@@ -210,7 +210,7 @@ packages/
     #   - Calls POST /instances/register with detected instance type
     #   - Starts 60s heartbeat interval calling POST /instances/heartbeat
     # Instance type detection priority: CONDUIT_INSTANCE_TYPE env override → OPENCODE=1 → ~/.claude/ exists → 'unknown'
-    # sendConfigSync() and sendModelsSync() are skipped when instance type is 'opencode' (OpenCode handles these natively)
+    # `sendConfigSync()` sends opencode.json (OpenCode) or settings.json (Claude Code); `sendModelsSync()` always runs as a bootstrap fallback; the OpenCode plugin also sends both natively after its first load
     # Required env vars: CONDUIT_API_URL, CONDUIT_HOOK_TOKEN
     # Optional env vars: CONDUIT_INSTANCE_NAME, CONDUIT_INSTANCE_TYPE, CONDUIT_SKIP_BOOTSTRAP
     # Published to npm as @conduit-ai/mcp-server (bin: conduit-mcp)

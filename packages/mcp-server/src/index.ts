@@ -5,7 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { writeFile, readFile, mkdir, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { homedir, platform, hostname } from "node:os";
 import { createHmac } from "node:crypto";
 import { generateOpenCodePluginSource } from "@conduit/shared";
@@ -1067,14 +1067,37 @@ const CLAUDE_MODELS: ModelEntry[] = [
 ];
 
 async function sendConfigSync(): Promise<void> {
-  const settingsPath = join(homedir(), ".claude", "settings.json");
+  // Resolve config path based on the detected agent type.
+  // OpenCode: ~/.config/opencode/opencode.json (respects XDG_CONFIG_HOME and Windows USERPROFILE)
+  // Claude Code: ~/.claude/settings.json
+  let settingsPath: string;
+  if (INSTANCE_TYPE === "opencode") {
+    const xdg = process.env["XDG_CONFIG_HOME"];
+    if (xdg) {
+      settingsPath = join(xdg, "opencode", "opencode.json");
+    } else if (IS_WIN) {
+      const base = process.env["USERPROFILE"] ?? HOME;
+      settingsPath = join(base, ".config", "opencode", "opencode.json");
+    } else {
+      settingsPath = join(HOME, ".config", "opencode", "opencode.json");
+    }
+  } else {
+    settingsPath = join(HOME, ".claude", "settings.json");
+  }
+
   let raw: string;
   try {
     raw = await readFile(settingsPath, "utf8");
+    if (!raw.trim()) raw = "{}";
     JSON.parse(raw); // validate it's valid JSON
   } catch {
-    log("config.sync skipped — settings.json not found or invalid");
-    return;
+    // OpenCode's config may not exist yet — treat as empty config rather than skipping
+    if (INSTANCE_TYPE === "opencode") {
+      raw = "{}";
+    } else {
+      log("config.sync skipped — settings.json not found or invalid");
+      return;
+    }
   }
 
   const ts = Date.now();
@@ -1101,7 +1124,7 @@ async function sendConfigSync(): Promise<void> {
       body,
     });
     if (res.ok) {
-      log("config.sync sent — settings.json synced");
+      log(`config.sync sent — ${basename(settingsPath)} synced`);
     } else {
       const text = await res.text().catch(() => "");
       log(`config.sync failed: HTTP ${res.status} ${text}`);
@@ -1387,16 +1410,17 @@ async function main() {
     }
   }).catch(() => {});
 
-  // Config + model sync: skip when running inside OpenCode — the OpenCode plugin
-  // already handles both natively via its own hooks.
-  if (INSTANCE_TYPE !== "opencode") {
-    void sendConfigSync().catch(() => {});
-    void fetchProviderModels().then(async (providerModels) => {
-      await sendModelsSync(providerModels ?? CLAUDE_MODELS);
-    }).catch(() => {
-      void sendModelsSync(CLAUDE_MODELS);
-    });
-  }
+  // Config + model sync: always run so the dashboard is populated on first install,
+  // even before the OpenCode plugin has been loaded (it's written by bootstrapPushHooks
+  // above, but OpenCode only loads plugins at startup — not at runtime).
+  // The OpenCode plugin will also send these on its own startup after the next restart;
+  // the server upserts both gracefully so duplicate syncs are harmless.
+  void sendConfigSync().catch(() => {});
+  void fetchProviderModels().then(async (providerModels) => {
+    await sendModelsSync(providerModels ?? CLAUDE_MODELS);
+  }).catch(() => {
+    void sendModelsSync(CLAUDE_MODELS);
+  });
 
   // Heartbeat: keep the instance marked 'connected' every 60 seconds.
   // Without this, idle Claude Code sessions (no hook events for >5 min)
