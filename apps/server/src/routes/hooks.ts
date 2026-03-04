@@ -189,6 +189,22 @@ TS=$(date +%s)000
 PAYLOAD="{\\"event\\":\\"$EVENT\\",\\"timestamp\\":\\"$ISO_NOW\\",\\"sessionId\\":\\"$SESSION\\",\\"data\\":$BODY}"
 SIG=$(printf '%s' "\${TS}.\${PAYLOAD}" | openssl dgst -sha256 -hmac "$TOKEN" -hex | awk '{print $NF}')
 
+curl -sX POST "\${API_URL}/hooks" \\
+  -H "Authorization: Bearer \${TOKEN}" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Conduit-Timestamp: \${TS}" \\
+  -H "X-Conduit-Signature: sha256=\${SIG}" \\
+  -d "\${PAYLOAD}" > /dev/null 2>&1 || true
+
+if [[ "$EVENT" == "SessionStart" ]]; then
+  SETTINGS="$HOME/.claude/settings.json"
+  if [[ -f "$SETTINGS" ]]; then
+    ISO2=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    TS2=$(date +%s)000
+    # Include the real session_id so the server can resolve the correct instance
+    # even when multiple Claude Code instances are registered for the same user.
+    CONFIG_PAYLOAD="{\\"event\\":\\"config.sync\\",\\"timestamp\\":\\"$ISO2\\",\\"sessionId\\":\\"$SESSION\\",\\"data\\":{\\"agentType\\":\\"claude-code\\",\\"content\\":$(python3 -c "import sys,json; print(json.dumps(open(sys.argv[1]).read()))" "$SETTINGS")}}"
+    SIG2=$(printf '%s' "\${TS2}.\${CONFIG_PAYLOAD}" | openssl dgst -sha256 -hmac "$TOKEN" -hex | awk '{print $NF}')
     curl -sX POST "\${API_URL}/hooks" \\
       -H "Authorization: Bearer \${TOKEN}" \\
       -H "Content-Type: application/json" \\
@@ -198,25 +214,35 @@ SIG=$(printf '%s' "\${TS}.\${PAYLOAD}" | openssl dgst -sha256 -hmac "$TOKEN" -he
   fi
 
   # Check for pending config update from dashboard
-  PENDING=$(curl -sf "\${API_URL}/config/pending" \\
+  # Pass ?sessionId= so the server resolves the exact instance for this machine.
+  PENDING=$(curl -sf "\${API_URL}/config/pending?sessionId=\${SESSION}" \\
     -H "Authorization: Bearer \${TOKEN}" 2>/dev/null || echo "")
   if [[ -n "$PENDING" ]]; then
-    CONTENT=$(printf '%s' "$PENDING" | python3 -c "
-import json,sys
+    python3 - <<'CFGPYEOF' "\${PENDING}" "\${API_URL}" "\${TOKEN}" "\${SETTINGS}" || true
+import json, sys, urllib.request
+
+pending_json, api_url, token, settings_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 try:
-  body = json.load(sys.stdin)
-  c = (body.get('data') or {}).get('content')
-  if c: print(c, end='')
-except: pass
-" 2>/dev/null || echo "")
-    if [[ -n "$CONTENT" ]]; then
-      mkdir -p "$(dirname "$SETTINGS")"
-      printf '%s' "$CONTENT" > "$SETTINGS"
-      curl -sf -X POST "\${API_URL}/config/ack" \\
-        -H "Authorization: Bearer \${TOKEN}" \\
-        -H "Content-Type: application/json" \\
-        -d '{}' > /dev/null 2>&1 || true
-    fi
+    body = json.loads(pending_json)
+    data = body.get('data') or {}
+    content = data.get('content')
+    instance_id = data.get('instanceId', '')
+    if not content:
+        sys.exit(0)
+    import os
+    os.makedirs(os.path.dirname(settings_path) or '.', exist_ok=True)
+    with open(settings_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    req = urllib.request.Request(
+        f"{api_url}/config/ack",
+        data=json.dumps({"instanceId": instance_id}).encode(),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    urllib.request.urlopen(req, timeout=5)
+except Exception:
+    pass
+CFGPYEOF
   fi
 fi
 `;
