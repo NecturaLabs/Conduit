@@ -20,8 +20,8 @@ const registerInstanceSchema = z.object({
   name: z.string().min(1).max(200),
   type: z.enum(['opencode', 'claude-code']),
   url: z.string().url().optional(),
-  version: z.string().max(50).optional(),
-  mcpServerVersion: z.string().max(50).optional(),
+  version: z.string().max(50).nullable().optional(),
+  mcpServerVersion: z.string().max(50).nullable().optional(),
 });
 
 /** In-memory store for dynamic version info sent via register/heartbeat. */
@@ -267,8 +267,8 @@ export async function instanceRegisterRoute(fastify: FastifyInstance): Promise<v
 export async function instanceHeartbeatRoute(fastify: FastifyInstance): Promise<void> {
   const heartbeatSchema = z.object({
     type: z.enum(['opencode', 'claude-code']),
-    version: z.string().optional(),
-    mcpServerVersion: z.string().max(50).optional(),
+    version: z.string().nullable().optional(),
+    mcpServerVersion: z.string().max(50).nullable().optional(),
   });
 
   fastify.post(

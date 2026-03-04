@@ -21,7 +21,9 @@ COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
 
 ARG VITE_API_URL
+ARG VITE_COMMIT_SHA
 ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_COMMIT_SHA=${VITE_COMMIT_SHA}
 
 RUN cd packages/shared && bun run build && cd /app/apps/web && bun run build
 

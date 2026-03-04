@@ -65,6 +65,7 @@ jobs:
       - name: Build frontend
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_COMMIT_SHA: ${{ github.sha }}
         run: bash scripts/build-netlify.sh
 
       - name: Deploy to Netlify

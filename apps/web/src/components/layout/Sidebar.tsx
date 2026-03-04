@@ -16,6 +16,11 @@ const navItems = [
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+declare const __COMMIT_SHA__: string;
+
+const commitSha: string = typeof __COMMIT_SHA__ !== 'undefined' ? __COMMIT_SHA__ : 'dev';
+const shortSha = commitSha.length > 7 ? commitSha.slice(0, 7) : commitSha;
+
 export function Sidebar() {
   return (
     <>
@@ -47,6 +52,11 @@ export function Sidebar() {
             </NavLink>
           ))}
         </nav>
+        <div className="border-t border-[var(--color-border)] px-3 py-2">
+          <span className="text-[11px] font-mono text-[var(--color-muted)]">
+            build {shortSha}
+          </span>
+        </div>
       </aside>
 
       {/* Mobile bottom tab bar — visible below lg */}

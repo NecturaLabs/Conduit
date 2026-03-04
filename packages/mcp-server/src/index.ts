@@ -64,7 +64,7 @@ const INSTANCE_TYPE = detectInstanceType();
  * - Claude Code: read CLAUDE_CODE_VERSION env var, or spawn `claude --version`
  * Falls back to the MCP package version if nothing else works.
  */
-async function detectCliVersion(): Promise<string> {
+async function detectCliVersion(): Promise<string | null> {
   if (INSTANCE_TYPE === "opencode") {
     const opencodeUrl = process.env["OPENCODE_URL"];
     if (opencodeUrl) {
@@ -91,7 +91,7 @@ async function detectCliVersion(): Promise<string> {
       if (match?.[1]) return match[1];
     } catch { /* fall through */ }
   }
-  return PKG_VERSION;
+  return null;
 }
 
 function log(msg: string): void {

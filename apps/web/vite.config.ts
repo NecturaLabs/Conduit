@@ -6,6 +6,9 @@ import path from 'path';
 const isMobile = process.env['VITE_MOBILE'] === 'true';
 
 export default defineConfig({
+  define: {
+    __COMMIT_SHA__: JSON.stringify(process.env['VITE_COMMIT_SHA'] ?? 'dev'),
+  },
   plugins: [react(), tailwindcss()],
   // Mobile (Capacitor): use relative paths so assets load from the embedded WebView.
   // Web (Netlify): use /app/ so the SPA is served under the /app/ subpath.
