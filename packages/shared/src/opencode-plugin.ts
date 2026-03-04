@@ -385,7 +385,7 @@ function startPromptStream(client) {
             // A prompt just arrived — inject it immediately.
             // Pass the sessionId from the event so the prompt is routed to the
             // correct session rather than auto-discovered (Bug B fix).
-            let queuedSessionId: string | null = null;
+            let queuedSessionId = null;
             try {
               const parsed = JSON.parse(data);
               queuedSessionId = parsed?.sessionId ?? null;
@@ -421,7 +421,7 @@ export const ConduitPlugin = ({ client }) => {
       // instead of the unreliable SSE -> poll -> promptAsync chain (Path B).
       const opencodeUrl = process.env["OPENCODE_URL"] ?? null;
       // Fetch the OpenCode CLI version from its local HTTP API before registering.
-      let version: string | null = null;
+      let version = null;
       if (opencodeUrl) {
         try {
           const healthResp = await fetch(\`\${opencodeUrl}/global/health\`);
@@ -434,7 +434,7 @@ export const ConduitPlugin = ({ client }) => {
       await fetch(\`\${API_URL}/instances/register\`, {
         method: "POST",
         headers: { "Authorization": \`Bearer \${TOKEN}\`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name, type: "opencode", url: opencodeUrl, version, mcpServerVersion: MCP_SERVER_VERSION }),
+        body: JSON.stringify({ name, type: "opencode", ...(opencodeUrl != null ? { url: opencodeUrl } : {}), version, mcpServerVersion: MCP_SERVER_VERSION }),
       });
     } catch (e) { console.error("[conduit] instance registration error:", e); }
 
