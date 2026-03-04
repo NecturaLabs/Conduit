@@ -350,7 +350,7 @@ export async function sendMessage(
   const url = `${base}/session/${encodeURIComponent(sessionId)}/prompt_async`;
 
   if (baseUrl) {
-    await resolveAndValidateUrl(url);
+    await resolveAndValidateUrl(url, { allowLoopback: true });
   }
 
   const headers: Record<string, string> = {
@@ -400,7 +400,7 @@ export async function sendCommand(
   const url = `${base}/session/${encodeURIComponent(sessionId)}/command`;
 
   if (baseUrl) {
-    await resolveAndValidateUrl(url);
+    await resolveAndValidateUrl(url, { allowLoopback: true });
   }
 
   const headers: Record<string, string> = {

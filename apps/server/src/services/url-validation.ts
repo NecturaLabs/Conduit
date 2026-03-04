@@ -245,9 +245,9 @@ export function validateUrlNotPrivate(urlString: string, options: ValidateUrlOpt
  * Throws if the URL is invalid, targets a private hostname/IP (static check),
  * or resolves to a private/reserved IP address (DNS check).
  */
-export async function resolveAndValidateUrl(urlString: string): Promise<void> {
+export async function resolveAndValidateUrl(urlString: string, options: ValidateUrlOptions = {}): Promise<void> {
   // Step 1 — static checks (scheme, credentials, blocked hostnames, raw IPs)
-  validateUrlNotPrivate(urlString);
+  validateUrlNotPrivate(urlString, options);
 
   // Step 2 — DNS resolution check
   let parsed: URL;
