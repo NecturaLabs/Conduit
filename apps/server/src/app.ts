@@ -18,6 +18,7 @@ import { metricsRoutes } from './routes/metrics.js';
 import { instanceRoutes, instanceRegisterRoute, instanceDeregisterRoute, instanceHeartbeatRoute } from './routes/instances.js';
 import { promptRelayRoutes } from './routes/prompts.js';
 import { modelsRoutes } from './routes/models.js';
+import { agentRoutes } from './routes/agent.js';
 import { requireCsrf } from './middleware/auth.js';
 import { startCleanupJob, stopCleanupJob } from './services/cleanup.js';
 import { MetricsAggregator } from './services/metrics-aggregator.js';
@@ -303,6 +304,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
     // Prompt relay — /prompts/* (own auth via hook token, no CSRF)
     await api.register(promptRelayRoutes, { prefix: '/prompts' });
+
+    // Agent endpoints — /agent/* (own auth via per-user hook token, no CSRF)
+    await api.register(agentRoutes, { prefix: '/agent' });
   });
 
   return fastify;
