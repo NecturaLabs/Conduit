@@ -444,7 +444,7 @@ function SetupInstructions() {
                   <code className="font-mono text-[var(--color-text)] bg-[var(--color-surface)] px-1.5 py-0.5 rounded text-[13px]">~/.claude/skills/conduit/</code>{' '}
                   and adds setup instructions to your CLAUDE.md.
                 </p>
-                <CopyBlock command="npx @conduit-ai/skills" />
+                <CopyBlock command="npx @conduit-ai/mcp-server" />
               </div>
 
               {/* Step 2 */}
