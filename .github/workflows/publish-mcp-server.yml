@@ -1,19 +1,18 @@
-# Publish @conduit-ai/mcp-server to npm
+# Publish @conduit-ai/skills to npm
 #
-# Triggers on push to main when packages/mcp-server/** changes.
+# Triggers on push to main when packages/skills/** changes.
 # Skips publish if the version in package.json already exists on npm.
 #
 # Required repository secrets:
 #   NPM_TOKEN - npm automation token with publish access to @conduit-ai scope
 
-name: Publish MCP Server
+name: Publish Skills Package
 
 on:
   push:
     branches: [main]
     paths:
-      - 'packages/mcp-server/**'
-      - 'packages/shared/**'
+      - 'packages/skills/**'
       - '.github/workflows/publish-mcp-server.yml'
   workflow_dispatch:
 
@@ -45,8 +44,6 @@ jobs:
         with:
           bun-version: '1.2'
 
-      # Install in the monorepo root so workspace:* deps resolve correctly.
-      # bun build inlines @conduit/shared into the dist bundle.
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
@@ -54,12 +51,10 @@ jobs:
       # Keeps bumping until it finds a version that hasn't been published yet.
       # The bumped version is used locally for the build/publish only — it is NOT
       # committed back to main (branch protection rules block direct pushes).
-      # The next push-triggered run will re-detect the published version and bump
-      # again if needed, making the process idempotent.
       - name: Auto-increment version if needed
         id: auto-bump
         run: |
-          cd packages/mcp-server
+          cd packages/skills
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           CURRENT=$(node -p "require('./package.json').version")
           VERSION="$CURRENT"
@@ -81,8 +76,6 @@ jobs:
 
           if [ "$VERSION" != "$CURRENT" ]; then
             echo "Bumping $PACKAGE_NAME from $CURRENT → $VERSION (local only, not committed)"
-
-            # Update package.json locally for the build step
             node -e "
               const fs = require('fs');
               const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -97,34 +90,34 @@ jobs:
 
       - name: Build
         run: bun run build
-        working-directory: packages/mcp-server
+        working-directory: packages/skills
 
       # Copy built artifacts to an isolated directory for npm publish.
       # This avoids npm seeing the monorepo root and workspace:* references.
       - name: Prepare publish directory
         run: |
-          mkdir -p /tmp/mcp-publish
-          cp packages/mcp-server/package.json /tmp/mcp-publish/
-          cp -r packages/mcp-server/dist /tmp/mcp-publish/
+          mkdir -p /tmp/skills-publish
+          cp packages/skills/package.json /tmp/skills-publish/
+          cp -r packages/skills/dist /tmp/skills-publish/
+          cp -r packages/skills/bin /tmp/skills-publish/
+          cp -r packages/skills/skills /tmp/skills-publish/
 
-          # Strip workspace:* devDependencies and prepublishOnly script —
-          # npm can't resolve workspace deps and the build already ran above.
+          # Strip devDependencies and prepublishOnly script.
           node -e "
-            const pkg = require('./packages/mcp-server/package.json');
+            const pkg = require('./packages/skills/package.json');
             delete pkg.devDependencies;
-            delete pkg.scripts.prepublishOnly;
+            if (pkg.scripts) delete pkg.scripts.prepublishOnly;
             require('fs').writeFileSync(
-              '/tmp/mcp-publish/package.json',
+              '/tmp/skills-publish/package.json',
               JSON.stringify(pkg, null, 2) + '\n'
             );
           "
 
       - name: Check if version already published
         id: version-check
-        working-directory: /tmp/mcp-publish
+        working-directory: /tmp/skills-publish
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
-          # Use the version resolved (and potentially bumped) in auto-bump step
           PACKAGE_VERSION="${{ steps.auto-bump.outputs.version }}"
           echo "name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
           echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
@@ -140,8 +133,7 @@ jobs:
 
       - name: Publish to npm
         if: steps.version-check.outputs.exists == 'false'
-        working-directory: /tmp/mcp-publish
-        # --provenance requires a public source repo; omitted for private repos.
+        working-directory: /tmp/skills-publish
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
