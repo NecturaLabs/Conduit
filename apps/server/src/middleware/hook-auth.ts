@@ -127,11 +127,13 @@ export async function requireAgentToken(
 ): Promise<void> {
   const resolution = resolveHookTokenUser(request);
   if (!resolution || resolution.userId === null) {
-    reply.code(401).send({
+    reply.hijack();
+    reply.raw.writeHead(401, { 'Content-Type': 'application/json' });
+    reply.raw.end(JSON.stringify({
       error: 'Unauthorized',
       message: 'A valid per-user hook token is required for agent endpoints',
       statusCode: 401,
-    });
+    }));
     return;
   }
   request.agentUserId = resolution.userId;

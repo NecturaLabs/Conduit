@@ -1,5 +1,6 @@
 import { afterEach, beforeEach } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
 import { buildApp } from '../src/app.js';
 import { createAccessToken, createRefreshToken, generateId, hashToken } from '../src/services/auth.js';
 
@@ -95,4 +96,15 @@ export function createTestTokens(user: { id: string; email: string }): {
   `).run(refreshId, refreshHash, user.id, familyId, expires);
 
   return { accessToken, refreshToken, familyId };
+}
+
+export async function createTestHookToken(userId: string): Promise<string> {
+  const plaintext = crypto.randomUUID();
+  const hash = createHash('sha256').update(plaintext).digest('hex');
+  const tokenPrefix = hash.slice(0, 8);
+  app.db.prepare(
+    `INSERT INTO hook_tokens (id, user_id, token_hash, token_prefix, created_at)
+     VALUES (?, ?, ?, ?, datetime('now'))`,
+  ).run(crypto.randomUUID(), userId, hash, tokenPrefix);
+  return plaintext;
 }
