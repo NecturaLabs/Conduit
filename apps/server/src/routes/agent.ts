@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { randomUUID, randomBytes } from 'node:crypto';
+import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import type { Database } from 'bun:sqlite';
 import type { ApiError } from '@conduit/shared';
 import { requireAgentToken } from '../middleware/hook-auth.js';
@@ -391,11 +391,12 @@ export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
 
       const db = fastify.db;
 
+      // First check if the session exists at all (for pending/expired status)
       const row = db.query(
-        `SELECT device_code, approved, hook_token
+        `SELECT device_code, approved
          FROM device_flow_sessions
          WHERE device_code = ? AND expires_at > datetime('now')`,
-      ).get(deviceCode) as { device_code: string; approved: number; hook_token: string | null } | undefined;
+      ).get(deviceCode) as { device_code: string; approved: number } | undefined;
 
       if (!row) {
         return reply.code(200).send({ status: 'expired' });
@@ -405,11 +406,39 @@ export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.code(200).send({ status: 'pending' });
       }
 
-      // Approved — return the token and delete the row (one-time use)
-      const token = row.hook_token;
-      db.query(`DELETE FROM device_flow_sessions WHERE device_code = ?`).run(deviceCode);
+      // Approved — atomically consume the session row via a transaction.
+      // Token is generated here (at poll time) so plaintext is never stored in device_flow_sessions.
+      // The transaction ensures only one concurrent poller can consume the row (prevents race condition).
+      const userId = db.transaction(() => {
+        const session = db.query(
+          `SELECT user_id FROM device_flow_sessions WHERE device_code = ? AND approved = 1`,
+        ).get(deviceCode) as { user_id: string } | null;
 
-      return reply.code(200).send({ status: 'approved', token });
+        if (!session) return null;
+
+        const del = db.query(
+          `DELETE FROM device_flow_sessions WHERE device_code = ? AND approved = 1`,
+        ).run(deviceCode) as { changes: number };
+
+        if (del.changes === 0) return null; // already consumed by a concurrent poller
+
+        return session.user_id;
+      })();
+
+      if (!userId) {
+        return reply.code(200).send({ status: 'expired' });
+      }
+
+      // Generate and store the hook token now that the session is consumed
+      const plaintextToken = randomBytes(32).toString('hex');
+      const tokenHash = createHash('sha256').update(plaintextToken).digest('hex');
+      const tokenPrefix = plaintextToken.slice(0, 8);
+
+      db.query(
+        `INSERT INTO hook_tokens (id, user_id, token_hash, token_prefix, created_at) VALUES (?, ?, ?, ?, datetime('now'))`,
+      ).run(randomUUID(), userId, tokenHash, tokenPrefix);
+
+      return reply.code(200).send({ status: 'approved', token: plaintextToken });
     },
   );
 }

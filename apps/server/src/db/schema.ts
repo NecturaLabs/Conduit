@@ -202,15 +202,15 @@ CREATE INDEX IF NOT EXISTS idx_metrics_dedup_hour ON metrics_dedup(hour_bucket);
 -- Device flow sessions for RFC 8628-style terminal activation.
 -- Replaces in-memory Maps so sessions survive server restarts.
 -- approved is 0 (pending) or 1 (user approved via dashboard).
--- hook_token is written by /install/approve and read (once) by /install/poll.
--- Expired rows are pruned inline at the start of /install/device and /install/approve.
+-- hook_token column is unused (token generated at poll time, never stored here).
+-- Expired rows are pruned inline at the start of /agent/auth/device.
 CREATE TABLE IF NOT EXISTS device_flow_sessions (
   device_code   TEXT PRIMARY KEY,
   user_code     TEXT NOT NULL UNIQUE,
   approved      INTEGER NOT NULL DEFAULT 0,
   expires_at    TEXT NOT NULL,
   user_id       TEXT REFERENCES users(id),
-  hook_token    TEXT,
+  hook_token    TEXT,  -- unused: kept for schema compatibility; plaintext never written here
   attempt_count INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT DEFAULT (datetime('now'))
 );

@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import type {
   MagicLinkResponse,
   ApiError,
@@ -507,19 +506,15 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       const db = fastify.db;
       const userId = request.user!.id;
 
-      // Generate a new hook token BEFORE the atomic UPDATE so it can be committed atomically.
-      const newToken = randomBytes(32).toString('hex');
-      const tokenHash = createHash('sha256').update(newToken).digest('hex');
-      const tokenPrefix = newToken.slice(0, 8);
-
       // Atomic UPDATE: acts as the gate against both double-approval (TOCTOU) and
       // brute-force (attempt_count < 10). Only one concurrent request will get changes = 1.
-      // Increment attempt_count on every attempt regardless of outcome (done below).
+      // No hook token is generated here — token generation is deferred to poll time so
+      // plaintext tokens are never stored in device_flow_sessions.
       const approveResult = db.query(
         `UPDATE device_flow_sessions
-         SET approved = 1, user_id = ?, hook_token = ?
+         SET approved = 1, user_id = ?
          WHERE user_code = ? AND approved = 0 AND expires_at > datetime('now') AND attempt_count < 10`,
-      ).run(userId, newToken, normalized) as { changes: number };
+      ).run(userId, normalized) as { changes: number };
 
       // Always increment the attempt counter so brute-force attempts are bounded.
       db.query(
@@ -534,12 +529,6 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         };
         return reply.code(404).send(error);
       }
-
-      // INSERT the hook token only after we know we won the atomic UPDATE race.
-      // SQLite serializes writes so no second approval can slip through between these two statements.
-      db.query(
-        `INSERT INTO hook_tokens (id, user_id, token_hash, token_prefix) VALUES (?, ?, ?, ?)`,
-      ).run(randomUUID(), userId, tokenHash, tokenPrefix);
 
       return reply.code(200).send({ ok: true });
     },
