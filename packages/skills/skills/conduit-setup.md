@@ -4,7 +4,10 @@ Follow these steps when the user runs /conduit-setup:
 
 ## Step 1: Get API URL
 
-Ask: "What is your Conduit server URL? (e.g. https://conduit.example.com)"
+Say: "Conduit server URL [https://conduit-api.necturalabs.com]: " and wait for input.
+
+If the user presses Enter or provides nothing, use `https://conduit-api.necturalabs.com`.
+Otherwise use whatever URL they provide (strip trailing slash).
 
 Store as CONDUIT_API_URL.
 
@@ -33,26 +36,42 @@ Expected response:
 }
 
 Tell the user:
-"To connect Claude Code to Conduit:
-1. Visit: {verificationUrl}
-2. Log in to your Conduit account if prompted
-3. Enter this code: {userCode}
-4. Click Approve
+"✓ Open this URL to approve the connection:
 
-I'll wait while you complete this..."
+  {verificationUrl}
+
+  Log in if prompted, then enter code: **{userCode}**
+
+  Waiting for approval..."
 
 ## Step 4: Poll for approval
 
-Poll GET {CONDUIT_API_URL}/agent/auth/poll?deviceCode={deviceCode} every 5 seconds.
+Run a single Bash command that loops until approved, expired, or timed out (120 attempts × 5s = 10 min):
 
-Use the Bash tool: `sleep 5 && curl -s "{CONDUIT_API_URL}/agent/auth/poll?deviceCode={deviceCode}"`
+```bash
+DEVICE_CODE="{deviceCode}"
+API_URL="{CONDUIT_API_URL}"
+for i in $(seq 1 120); do
+  sleep 5
+  RESP=$(curl -s "$API_URL/agent/auth/poll?deviceCode=$DEVICE_CODE")
+  STATUS=$(echo "$RESP" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+  if [ "$STATUS" = "approved" ]; then
+    echo "$RESP"
+    break
+  elif [ "$STATUS" = "expired" ]; then
+    echo '{"status":"expired"}'
+    break
+  fi
+  if [ "$i" = "120" ]; then
+    echo '{"status":"timeout"}'
+  fi
+done
+```
 
-Poll up to 120 times (10 minutes at 5-second intervals). Keep a count — after 120 polls, consider it timed out.
-
-Continue polling until:
-- Response is `{ "status": "approved", "token": "..." }` → store the token, go to Step 5
-- Response is `{ "status": "expired" }` → tell user "Code expired. Run /conduit-setup again." and stop
-- Poll count reaches 120 → tell user "Timed out. Run /conduit-setup again." and stop
+Parse the final output:
+- `"status":"approved"` → extract `token` value, go to Step 5
+- `"status":"expired"` → tell user "Code expired. Run /conduit-setup again." and stop
+- `"status":"timeout"` → tell user "Timed out. Run /conduit-setup again." and stop
 
 ## Step 5: Store credentials
 
