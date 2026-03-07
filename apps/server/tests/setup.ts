@@ -51,7 +51,7 @@ export function createTestUser(overrides: Record<string, unknown> = {}): {
   const email = `test-${id.slice(0, 8)}@example.com`;
 
   const db = app.db;
-  db.prepare(`
+  db.query(`
     INSERT INTO users (id, email, display_name, use_case, onboarding_complete, trial_started_at)
     VALUES (?, ?, ?, ?, ?, datetime('now'))
   `).run(
@@ -90,7 +90,7 @@ export function createTestTokens(user: { id: string; email: string }): {
   const refreshHash = hashToken(refreshToken);
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  app.db.prepare(`
+  app.db.query(`
     INSERT INTO refresh_tokens (id, token_hash, user_id, family_id, expires_at)
     VALUES (?, ?, ?, ?, ?)
   `).run(refreshId, refreshHash, user.id, familyId, expires);
@@ -98,11 +98,11 @@ export function createTestTokens(user: { id: string; email: string }): {
   return { accessToken, refreshToken, familyId };
 }
 
-export async function createTestHookToken(userId: string): Promise<string> {
+export function createTestHookToken(userId: string): string {
   const plaintext = crypto.randomUUID();
   const hash = createHash('sha256').update(plaintext).digest('hex');
-  const tokenPrefix = hash.slice(0, 8);
-  app.db.prepare(
+  const tokenPrefix = plaintext.slice(0, 8);
+  app.db.query(
     `INSERT INTO hook_tokens (id, user_id, token_hash, token_prefix, created_at)
      VALUES (?, ?, ?, ?, datetime('now'))`,
   ).run(crypto.randomUUID(), userId, hash, tokenPrefix);

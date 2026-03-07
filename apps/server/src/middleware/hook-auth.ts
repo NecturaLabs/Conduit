@@ -123,18 +123,15 @@ declare module 'fastify' {
  */
 export async function requireAgentToken(
   request: FastifyRequest,
-  reply: FastifyReply,
+  _reply: FastifyReply,
 ): Promise<void> {
   const resolution = resolveHookTokenUser(request);
   if (!resolution || resolution.userId === null) {
-    reply.hijack();
-    reply.raw.writeHead(401, { 'Content-Type': 'application/json' });
-    reply.raw.end(JSON.stringify({
-      error: 'Unauthorized',
-      message: 'A valid per-user hook token is required for agent endpoints',
+    const err = Object.assign(new Error('A valid per-user hook token is required for agent endpoints'), {
       statusCode: 401,
-    }));
-    return;
+      name: 'Unauthorized',
+    });
+    throw err;
   }
   request.agentUserId = resolution.userId;
 }

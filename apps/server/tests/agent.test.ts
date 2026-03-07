@@ -16,7 +16,7 @@ function insertPrompt(
   overrides: Record<string, unknown> = {},
 ) {
   const id = crypto.randomUUID();
-  app.db.prepare(
+  app.db.query(
     `INSERT INTO pending_prompts (id, session_id, user_id, content, status, is_command, command_name)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ).run(
@@ -72,14 +72,14 @@ describe('Agent route authentication', () => {
   it('accepts a valid per-user hook token → not 401', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
     const res = await app.inject({
       method: 'POST',
       url: '/agent/register',
       payload: {},
       headers: agentHeaders(token),
     });
-    expect(res.statusCode).not.toBe(401);
+    expect(res.statusCode).toBe(200);
   });
 });
 
@@ -89,7 +89,7 @@ describe('POST /agent/register', () => {
   it('creates an instance on first call and returns instanceId', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -104,7 +104,7 @@ describe('POST /agent/register', () => {
     expect(body.status).toBe('registered');
 
     // Verify the instance exists in DB
-    const instance = app.db.prepare(
+    const instance = app.db.query(
       `SELECT * FROM instances WHERE id = ?`,
     ).get(body.instanceId) as Record<string, unknown> | undefined;
     expect(instance).toBeDefined();
@@ -116,7 +116,7 @@ describe('POST /agent/register', () => {
   it('is idempotent — second call returns the same instanceId', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res1 = await app.inject({
       method: 'POST',
@@ -139,7 +139,7 @@ describe('POST /agent/register', () => {
   it('stores the provided name in the instances table', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -150,7 +150,7 @@ describe('POST /agent/register', () => {
 
     expect(res.statusCode).toBe(200);
     const { instanceId } = res.json();
-    const row = app.db.prepare(
+    const row = app.db.query(
       `SELECT name FROM instances WHERE id = ?`,
     ).get(instanceId) as { name: string } | undefined;
     expect(row?.name).toBe('special-name');
@@ -163,7 +163,7 @@ describe('POST /agent/event', () => {
   it('accepts a session.start event → 200 and stores in hook_events', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -175,17 +175,39 @@ describe('POST /agent/event', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().ok).toBe(true);
 
-    const row = app.db.prepare(
+    const row = app.db.query(
       `SELECT event_type, session_id FROM hook_events WHERE session_id = 'sess-abc' LIMIT 1`,
     ).get() as Record<string, unknown> | undefined;
     expect(row).toBeDefined();
     expect(row!['event_type']).toBe('SessionStart');
   });
 
+  it('accepts a session.end event → 200 and stores Stop in hook_events', async () => {
+    const app = getApp();
+    const user = createTestUser();
+    const token = createTestHookToken(user.id);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/agent/event',
+      payload: { type: 'session.end', sessionId: 'sess-end-1', data: {} },
+      headers: agentHeaders(token),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+
+    const row = app.db.query(
+      `SELECT event_type FROM hook_events WHERE session_id = 'sess-end-1' LIMIT 1`,
+    ).get() as { event_type: string } | undefined;
+    expect(row).toBeDefined();
+    expect(row!['event_type']).toBe('Stop');
+  });
+
   it('accepts a message event with inputTokens/outputTokens → 200', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -200,7 +222,7 @@ describe('POST /agent/event', () => {
 
     expect(res.statusCode).toBe(200);
 
-    const row = app.db.prepare(
+    const row = app.db.query(
       `SELECT event_type, payload FROM hook_events WHERE session_id = 'sess-msg-1' LIMIT 1`,
     ).get() as { event_type: string; payload: string } | undefined;
     expect(row).toBeDefined();
@@ -212,7 +234,7 @@ describe('POST /agent/event', () => {
   it('accepts a tool.use event with toolName → 200', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -227,7 +249,7 @@ describe('POST /agent/event', () => {
 
     expect(res.statusCode).toBe(200);
 
-    const row = app.db.prepare(
+    const row = app.db.query(
       `SELECT event_type, payload FROM hook_events WHERE session_id = 'sess-tool-1' LIMIT 1`,
     ).get() as { event_type: string; payload: string } | undefined;
     expect(row).toBeDefined();
@@ -239,7 +261,7 @@ describe('POST /agent/event', () => {
   it('rejects an unknown event type → 400', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -254,7 +276,7 @@ describe('POST /agent/event', () => {
   it('rejects a missing sessionId → 400', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -273,7 +295,7 @@ describe('GET /agent/prompts', () => {
   it('returns an empty array when no pending prompts exist', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'GET',
@@ -288,7 +310,7 @@ describe('GET /agent/prompts', () => {
   it('returns pending prompts for the authenticated user', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
     insertPrompt(app, user.id, { content: 'Do something', session_id: 'sess-prompts-1' });
 
     const res = await app.inject({
@@ -308,7 +330,7 @@ describe('GET /agent/prompts', () => {
     const app = getApp();
     const user1 = createTestUser();
     const user2 = createTestUser();
-    const token2 = await createTestHookToken(user2.id);
+    const token2 = createTestHookToken(user2.id);
 
     // Insert a prompt for user1 only
     insertPrompt(app, user1.id, { content: 'User1 prompt' });
@@ -330,7 +352,7 @@ describe('POST /agent/prompts/:id/ack', () => {
   it('returns 404 if the prompt does not exist', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -346,7 +368,7 @@ describe('POST /agent/prompts/:id/ack', () => {
     const app = getApp();
     const user1 = createTestUser();
     const user2 = createTestUser();
-    const token2 = await createTestHookToken(user2.id);
+    const token2 = createTestHookToken(user2.id);
 
     const promptId = insertPrompt(app, user1.id);
 
@@ -363,7 +385,7 @@ describe('POST /agent/prompts/:id/ack', () => {
   it('successfully acks own prompt → 200 and updates status', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const promptId = insertPrompt(app, user.id);
 
@@ -378,7 +400,7 @@ describe('POST /agent/prompts/:id/ack', () => {
     expect(res.json().ok).toBe(true);
 
     // Verify status was updated in DB
-    const row = app.db.prepare(
+    const row = app.db.query(
       `SELECT status FROM pending_prompts WHERE id = ?`,
     ).get(promptId) as { status: string } | undefined;
     expect(row?.status).toBe('delivered');
@@ -391,7 +413,7 @@ describe('POST /agent/models', () => {
   it('syncs models for the authenticated user instance → 200', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
@@ -410,12 +432,12 @@ describe('POST /agent/models', () => {
     expect(res.json().synced).toBe(2);
 
     // Verify the instance was created and models were stored
-    const instance = app.db.prepare(
+    const instance = app.db.query(
       `SELECT id FROM instances WHERE user_id = ? AND type = 'claude-code' LIMIT 1`,
     ).get(user.id) as { id: string } | undefined;
     expect(instance).toBeDefined();
 
-    const models = app.db.prepare(
+    const models = app.db.query(
       `SELECT model_id FROM instance_models WHERE instance_id = ?`,
     ).all(instance!.id) as Array<{ model_id: string }>;
     expect(models.length).toBe(2);
@@ -426,8 +448,8 @@ describe('POST /agent/models', () => {
     const app = getApp();
     const user1 = createTestUser();
     const user2 = createTestUser();
-    const token1 = await createTestHookToken(user1.id);
-    const token2 = await createTestHookToken(user2.id);
+    const token1 = createTestHookToken(user1.id);
+    const token2 = createTestHookToken(user2.id);
 
     // Register user2 first so they have an instance
     await app.inject({
@@ -448,12 +470,12 @@ describe('POST /agent/models', () => {
     });
 
     // user2's instance should have no models
-    const instance2 = app.db.prepare(
+    const instance2 = app.db.query(
       `SELECT id FROM instances WHERE user_id = ? AND type = 'claude-code' LIMIT 1`,
     ).get(user2.id) as { id: string } | undefined;
     expect(instance2).toBeDefined();
 
-    const modelsForUser2 = app.db.prepare(
+    const modelsForUser2 = app.db.query(
       `SELECT model_id FROM instance_models WHERE instance_id = ?`,
     ).all(instance2!.id) as Array<{ model_id: string }>;
     expect(modelsForUser2.length).toBe(0);
@@ -462,7 +484,7 @@ describe('POST /agent/models', () => {
   it('rejects an empty models array shape (missing required fields) → 400', async () => {
     const app = getApp();
     const user = createTestUser();
-    const token = await createTestHookToken(user.id);
+    const token = createTestHookToken(user.id);
 
     const res = await app.inject({
       method: 'POST',
