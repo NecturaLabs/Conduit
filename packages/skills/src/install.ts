@@ -8,14 +8,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 function install(): void {
   const homeDir = homedir();
   const claudeDir = join(homeDir, '.claude');
-  const skillsDir = join(claudeDir, 'skills', 'conduit');
+  const commandsDir = join(claudeDir, 'commands');
 
-  // Create skills directory
-  mkdirSync(skillsDir, { recursive: true });
+  // Create commands directory
+  mkdirSync(commandsDir, { recursive: true });
 
-  // Copy setup skill
+  // Copy setup command
   const skillSrc = join(__dirname, '..', 'skills', 'conduit-setup.md');
-  const skillDst = join(skillsDir, 'conduit-setup.md');
+  const skillDst = join(commandsDir, 'conduit-setup.md');
   copyFileSync(skillSrc, skillDst);
 
   // Read auto-behavior content
