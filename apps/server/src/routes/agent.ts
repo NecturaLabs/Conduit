@@ -73,8 +73,8 @@ export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
          SET name = COALESCE(?, name),
              status = 'connected',
              last_seen = datetime('now')
-         WHERE id = ?`,
-      ).run(name ?? null, instanceId);
+         WHERE id = ? AND user_id = ?`,
+      ).run(name ?? null, instanceId, userId);
 
       emitInstanceUpdated(db, instanceId);
 
@@ -164,7 +164,7 @@ export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
         case 'tool.use': {
           eventType = 'PostToolUse';
           const toolName = typeof data['toolName'] === 'string' ? data['toolName'] : '';
-          payload = { toolName, ...data };
+          payload = { tool_name: toolName, ...data };
           aggregator.trackToolCall(userId, instanceId, eventId);
           break;
         }
@@ -188,8 +188,8 @@ export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
 
       // Keep instance marked connected
       db.query(
-        `UPDATE instances SET status = 'connected', last_seen = datetime('now') WHERE id = ?`,
-      ).run(instanceId);
+        `UPDATE instances SET status = 'connected', last_seen = datetime('now') WHERE id = ? AND user_id = ?`,
+      ).run(instanceId, userId);
 
       return reply.code(200).send({ ok: true });
     },
