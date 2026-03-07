@@ -42,6 +42,21 @@ const eventBodySchema = z.object({
   data: z.record(z.string(), z.unknown()),
 });
 
+const ackBodySchema = z.object({
+  status: z.enum(['delivered', 'failed']),
+  error: z.string().optional(),
+});
+
+const modelsBodySchema = z.object({
+  models: z.array(
+    z.object({
+      providerId: z.string(),
+      modelId: z.string(),
+      modelName: z.string(),
+    }),
+  ).max(500),
+});
+
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
@@ -201,10 +216,16 @@ export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
     const userId = request.agentUserId!;
     const db = fastify.db;
 
+    // Atomically promote pending → processing, then return only the rows we just claimed.
+    // This prevents the legacy /prompts/pending endpoint from racing and returning the same rows.
+    db.query(
+      `UPDATE pending_prompts SET status = 'processing' WHERE user_id = ? AND status = 'pending'`,
+    ).run(userId);
+
     const prompts = db.query(
       `SELECT id, session_id, content, is_command, command_name, created_at
        FROM pending_prompts
-       WHERE user_id = ? AND status = 'pending'
+       WHERE user_id = ? AND status = 'processing'
        ORDER BY created_at ASC`,
     ).all(userId) as Array<{
       id: string;
@@ -237,11 +258,7 @@ export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
       const { id } = request.params;
       const db = fastify.db;
 
-      const bodySchema = z.object({
-        status: z.enum(['delivered', 'failed']),
-        error: z.string().optional(),
-      });
-      const parsed = bodySchema.safeParse(request.body);
+      const parsed = ackBodySchema.safeParse(request.body);
       if (!parsed.success) {
         const error: ApiError = {
           error: 'Validation Error',
@@ -274,16 +291,7 @@ export async function agentRoutes(fastify: FastifyInstance): Promise<void> {
     const userId = request.agentUserId!;
     const db = fastify.db;
 
-    const bodySchema = z.object({
-      models: z.array(
-        z.object({
-          providerId: z.string(),
-          modelId: z.string(),
-          modelName: z.string(),
-        }),
-      ),
-    });
-    const parsed = bodySchema.safeParse(request.body);
+    const parsed = modelsBodySchema.safeParse(request.body);
     if (!parsed.success) {
       const error: ApiError = {
         error: 'Validation Error',
